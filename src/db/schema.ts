@@ -90,28 +90,25 @@ export const users = pgTable("users", {
     .defaultNow(),
 });
 
-export const sessions = pgTable("sessions", {
-  id: text("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
+/**
+ * Auth sessions use next-auth's JWT strategy (no adapter, nothing to persist
+ * here) — see src/auth.ts. Credentials-based sign-in, email verification,
+ * and password reset are hand-rolled on top of `users` and
+ * `verification_tokens` instead of next-auth's adapter/Email-provider
+ * machinery, which is built around OAuth account linking we don't need.
+ */
 export const verificationTokens = pgTable(
   "verification_tokens",
   {
     identifier: varchar("identifier", { length: 320 }).notNull(),
-    token: text("token").notNull(),
+    // SHA-256 hex digest of the token — the raw token is only ever sent in
+    // the email link, never stored, so a DB leak can't be used to log in.
+    tokenHash: text("token_hash").notNull(),
     purpose: varchar("purpose", { length: 32 }).notNull(), // 'verify-email' | 'reset-password'
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
   },
-  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+  (t) => [primaryKey({ columns: [t.identifier, t.tokenHash] })],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -495,12 +492,11 @@ export const auditLog = pgTable(
 /*  Relations                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export const usersRelations = relations(users, ({ one, many }) => ({
+export const usersRelations = relations(users, ({ one }) => ({
   member: one(members, {
     fields: [users.id],
     references: [members.userId],
   }),
-  sessions: many(sessions),
 }));
 
 export const membersRelations = relations(members, ({ one, many }) => ({

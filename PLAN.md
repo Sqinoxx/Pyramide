@@ -29,7 +29,7 @@ Turnierverwaltung. Beides kann später angedockt werden.
 | Framework | **Next.js 15 (App Router) + TypeScript** | Ein Repo für Frontend + API, SSR für schnelle mobile Ansicht, großes Ökosystem |
 | DB | **PostgreSQL 16** | Transaktionen + Constraints sind für die Pyramidenlogik zwingend |
 | ORM | **Drizzle ORM** + drizzle-kit Migrationen | typsicher, nah an SQL (wichtig für Positions-Updates in einer Transaktion) |
-| Auth | **Auth.js v5** (Credentials + E-Mail-Verifikation, optional Google) | Standard, Session in DB, Rollen einfach ergänzbar |
+| Auth | **Auth.js v5** (Credentials, JWT-Session) | E-Mail-Verifikation, Passwort-Reset und Rate-Limiting sind eigene, schlanke Implementierungen auf `users`/`verification_tokens` — Auth.js' Adapter-/Email-Provider-Mechanik ist auf OAuth-Account-Linking zugeschnitten und passt hier nicht |
 | UI | **Tailwind CSS + shadcn/ui** | schnelles, sauberes, mobile-first UI |
 | Validierung | **Zod** (geteilt Client/Server) + react-hook-form | eine Wahrheit für Formulare und API |
 | E-Mail | **Resend** oder SMTP (nodemailer) + React Email | Transaktionsmails, Templates versioniert im Repo |
