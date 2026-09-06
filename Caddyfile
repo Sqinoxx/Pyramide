@@ -1,0 +1,19 @@
+# Replace with your real domain before going live. Caddy fetches a Let's
+# Encrypt certificate automatically for any non-"localhost" domain, as long
+# as DNS for it already points at this server and ports 80+443 are reachable.
+{$DOMAIN:localhost} {
+	reverse_proxy app:3000
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
