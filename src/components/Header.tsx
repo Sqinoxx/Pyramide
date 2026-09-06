@@ -35,6 +35,12 @@ export async function Header() {
                 >
                   ITN-Zuordnung
                 </Link>
+                <Link
+                  href="/admin/saison"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Saison
+                </Link>
               </>
             )}
             <form
