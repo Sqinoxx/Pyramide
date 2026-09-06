@@ -1,8 +1,10 @@
 import { auth } from "@/auth";
 import { getActiveItnForMember, getMemberByUserId } from "@/server/members";
+import { findItnCandidatesForMember } from "@/server/itn-matching";
 import { formatItnBadge } from "@/lib/itn-precedence";
 import { ProfileForm } from "./ProfileForm";
 import { SelfItnForm } from "./SelfItnForm";
+import { confirmOwnItnMatchAction, dismissOwnItnMatchAction } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Warten auf Freigabe",
@@ -26,6 +28,10 @@ export default async function ProfilePage() {
   }
 
   const activeItn = await getActiveItnForMember(member.id);
+  const hasConfirmedImport = activeItn?.source === "import";
+  const match = hasConfirmedImport
+    ? { tier: "none" as const, candidates: [] }
+    : await findItnCandidatesForMember(member);
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-6 py-16">
@@ -41,6 +47,47 @@ export default async function ProfilePage() {
           Deine Registrierung wartet auf Freigabe durch einen Admin. Sobald du
           freigeschaltet bist, wirst du in die Pyramide aufgenommen.
         </div>
+      )}
+
+      {match.candidates.length > 0 && (
+        <section className="mb-8 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+          <h2 className="mb-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
+            Bist du das?
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {match.candidates.map((c) => (
+              <li
+                key={c.itnRecordId}
+                className="flex items-center justify-between rounded bg-white px-3 py-2 text-sm dark:bg-zinc-900"
+              >
+                <span>
+                  {c.firstName} {c.lastName} · Jg. {c.birthYear ?? "?"} ·{" "}
+                  {c.club ?? "kein Verein"} · ITN {c.itn.toFixed(1)}
+                </span>
+                <span className="flex gap-2">
+                  <form action={confirmOwnItnMatchAction}>
+                    <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
+                    <button
+                      type="submit"
+                      className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    >
+                      Das bin ich
+                    </button>
+                  </form>
+                  <form action={dismissOwnItnMatchAction}>
+                    <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700"
+                    >
+                      Nicht ich
+                    </button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="mb-8">

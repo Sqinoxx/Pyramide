@@ -1,10 +1,12 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   divisions,
   members,
   memberItn,
+  itnLinks,
+  itnRecords,
   positions,
   positionHistory,
   seasons,
@@ -226,4 +228,101 @@ export async function updateMemberProfile(
       showItnPublicly: data.showItnPublicly,
     })
     .where(eq(members.id, memberId));
+}
+
+/**
+ * Members (active or pending) who don't yet have a confirmed *import*
+ * ITN link — i.e. still worth running through the matching UI (PLAN.md
+ * §5.2). A member with only a self-reported value still shows up here,
+ * since a self entry never counts as "matched" against the official list.
+ */
+export async function listMembersForItnReview() {
+  return db
+    .select({ member: members, division: divisions })
+    .from(members)
+    .leftJoin(divisions, eq(members.divisionId, divisions.id))
+    .where(
+      and(
+        sql`${members.status} in ('active', 'pending')`,
+        notExists(
+          db
+            .select({ x: sql`1` })
+            .from(memberItn)
+            .where(
+              and(
+                eq(memberItn.memberId, members.id),
+                eq(memberItn.source, "import"),
+                isNull(memberItn.supersededAt),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(members.lastName, members.firstName);
+}
+
+/**
+ * Confirms a match between a member and an official ITN record — either the
+ * member themselves ("Das bin ich") or an admin acting on their behalf
+ * (PLAN.md §5.2: "Admin kann überschreiben"). Supersedes any prior *import*
+ * entry so re-matching after a newer import doesn't leave two active rows.
+ */
+export async function confirmItnMatch(memberId: string, itnRecordId: string, confirmedByUserId: string) {
+  await db.transaction(async (tx) => {
+    const record = await tx.query.itnRecords.findFirst({ where: eq(itnRecords.id, itnRecordId) });
+    if (!record) throw new Error("ITN record not found");
+
+    await tx
+      .insert(itnLinks)
+      .values({
+        memberId,
+        itnRecordId,
+        confidence: "1.000",
+        confirmedBy: confirmedByUserId,
+        confirmedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    await tx
+      .update(memberItn)
+      .set({ supersededAt: new Date() })
+      .where(
+        and(
+          eq(memberItn.memberId, memberId),
+          eq(memberItn.source, "import"),
+          isNull(memberItn.supersededAt),
+        ),
+      );
+
+    await tx.insert(memberItn).values({
+      memberId,
+      source: "import",
+      value: record.itn,
+      licenceNo: record.licenceNo,
+      asOf: record.validFrom,
+      createdBy: confirmedByUserId,
+    });
+  });
+}
+
+/** Admin-set ITN estimate for a member with no official match (PLAN.md §5.3). */
+export async function setAdminItn(memberId: string, value: number, setByUserId: string) {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(memberItn)
+      .set({ supersededAt: new Date() })
+      .where(
+        and(
+          eq(memberItn.memberId, memberId),
+          eq(memberItn.source, "admin"),
+          isNull(memberItn.supersededAt),
+        ),
+      );
+    await tx.insert(memberItn).values({
+      memberId,
+      source: "admin",
+      value: value.toFixed(1),
+      createdBy: setByUserId,
+    });
+  });
 }

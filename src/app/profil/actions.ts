@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { profileSchema, selfItnSchema } from "@/lib/validation";
-import { getMemberByUserId, setSelfItn, updateMemberProfile } from "@/server/members";
+import { confirmItnMatch, getMemberByUserId, setSelfItn, updateMemberProfile } from "@/server/members";
+import { dismissItnCandidate, findItnCandidatesForMember } from "@/server/itn-matching";
 import { fieldErrorsFromZod, type ActionState } from "@/lib/form-state";
 
 async function requireMember() {
@@ -50,4 +51,32 @@ export async function setSelfItnAction(
   await setSelfItn(member.id, userId, parsed.data.value);
   revalidatePath("/profil");
   return { success: true };
+}
+
+/**
+ * A member confirming a suggested ITN match themselves ("Das bin ich",
+ * PLAN.md §5.2). Unlike the admin equivalent (src/app/admin/itn/actions.ts),
+ * this re-derives the candidate list server-side and only accepts an
+ * itnRecordId that's actually in it — otherwise a member could link an
+ * arbitrary official record (and its ITN, which outranks a self entry) to
+ * themselves.
+ */
+export async function confirmOwnItnMatchAction(formData: FormData): Promise<void> {
+  const { member, userId } = await requireMember();
+  const itnRecordId = String(formData.get("itnRecordId") ?? "");
+
+  const { candidates } = await findItnCandidatesForMember(member);
+  if (!candidates.some((c) => c.itnRecordId === itnRecordId)) {
+    throw new Error("Not a valid candidate for this member");
+  }
+
+  await confirmItnMatch(member.id, itnRecordId, userId);
+  revalidatePath("/profil");
+}
+
+export async function dismissOwnItnMatchAction(formData: FormData): Promise<void> {
+  const { member, userId } = await requireMember();
+  const itnRecordId = String(formData.get("itnRecordId") ?? "");
+  await dismissItnCandidate(member.id, itnRecordId, userId);
+  revalidatePath("/profil");
 }

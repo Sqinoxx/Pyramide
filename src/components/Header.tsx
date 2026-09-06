@@ -16,12 +16,26 @@ export async function Header() {
               Profil
             </Link>
             {session.user.role === "admin" && (
-              <Link
-                href="/admin/mitglieder"
-                className="text-zinc-700 hover:underline dark:text-zinc-300"
-              >
-                Mitglieder
-              </Link>
+              <>
+                <Link
+                  href="/admin/mitglieder"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Mitglieder
+                </Link>
+                <Link
+                  href="/admin/itn-import"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  ITN-Import
+                </Link>
+                <Link
+                  href="/admin/itn"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  ITN-Zuordnung
+                </Link>
+              </>
             )}
             <form
               action={async () => {

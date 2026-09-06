@@ -229,6 +229,29 @@ export const itnLinks = pgTable(
 );
 
 /**
+ * "Nicht ich" for a suggested candidate (PLAN.md §5.2) — without this, the
+ * same rejected suggestion would keep reappearing every time matching is
+ * recomputed, since matching itself is stateless (run fresh from
+ * itn_records + members.normalized_name on every view, not cached).
+ */
+export const itnMatchDismissals = pgTable(
+  "itn_match_dismissals",
+  {
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    itnRecordId: text("itn_record_id")
+      .notNull()
+      .references(() => itnRecords.id, { onDelete: "cascade" }),
+    dismissedBy: text("dismissed_by")
+      .notNull()
+      .references(() => users.id),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.memberId, t.itnRecordId] })],
+);
+
+/**
  * Append-only ladder of ITN values per member. The *active* value for a
  * member is resolved in application code (and mirrored in a view) using the
  * precedence import > admin > self described in PLAN.md 5.4. Rows are never
