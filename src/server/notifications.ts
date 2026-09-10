@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { members, notifications, type notificationTypeEnum } from "@/db/schema";
 import { sendNotificationEmail } from "./mailer";
+import { escapeHtml as esc } from "@/lib/html-escape";
 
 type NotificationType = (typeof notificationTypeEnum.enumValues)[number];
 
@@ -48,7 +49,7 @@ export async function notifyChallengeReceived(
     {
       subject: "Du wurdest gefordert",
       text: `${challengerName} fordert dich heraus.`,
-      html: `<p><strong>${challengerName}</strong> fordert dich heraus. Bitte innerhalb der Frist annehmen oder ablehnen.</p>`,
+      html: `<p><strong>${esc(challengerName)}</strong> fordert dich heraus. Bitte innerhalb der Frist annehmen oder ablehnen.</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -62,7 +63,7 @@ export async function notifyChallengeAccepted(challengerMemberId: string, defend
     {
       subject: "Deine Forderung wurde angenommen",
       text: `${defenderName} hat deine Forderung angenommen. Bitte einen Termin ausmachen.`,
-      html: `<p><strong>${defenderName}</strong> hat deine Forderung angenommen. Macht einen Termin aus.</p>`,
+      html: `<p><strong>${esc(defenderName)}</strong> hat deine Forderung angenommen. Macht einen Termin aus.</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -80,7 +81,7 @@ export async function notifyChallengeDeclined(
     {
       subject: "Deine Forderung wurde abgelehnt",
       text: `${defenderName} hat deine Forderung abgelehnt.${reason ? ` Grund: ${reason}` : ""}`,
-      html: `<p><strong>${defenderName}</strong> hat deine Forderung abgelehnt.${reason ? ` Grund: ${reason}` : ""}</p>`,
+      html: `<p><strong>${esc(defenderName)}</strong> hat deine Forderung abgelehnt.${reason ? ` Grund: ${esc(reason)}` : ""}</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -94,7 +95,7 @@ export async function notifyResultReported(recipientMemberId: string, reporterNa
     {
       subject: "Ergebnis gemeldet — bitte bestätigen",
       text: `${reporterName} hat ein Ergebnis gemeldet. Bitte bestätigen oder bestreiten.`,
-      html: `<p><strong>${reporterName}</strong> hat ein Ergebnis gemeldet. Bitte bestätige es oder bestreite es.</p>`,
+      html: `<p><strong>${esc(reporterName)}</strong> hat ein Ergebnis gemeldet. Bitte bestätige es oder bestreite es.</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -126,7 +127,7 @@ export async function notifyWalkover(memberId: string, won: boolean, opponentNam
       text: won
         ? `Du hast gegen ${opponentName} durch Nichtantreten gewonnen.`
         : `Du hast gegen ${opponentName} durch Nichtantreten verloren.`,
-      html: `<p>${won ? `Sieg gegen ${opponentName} durch Nichtantreten.` : `Niederlage gegen ${opponentName} durch Nichtantreten.`}</p>`,
+      html: `<p>${won ? `Sieg gegen ${esc(opponentName)} durch Nichtantreten.` : `Niederlage gegen ${esc(opponentName)} durch Nichtantreten.`}</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -151,7 +152,7 @@ export async function notifyDeadlineReminder(
         kind === "accept"
           ? `Erinnerung: Nimm die Forderung von ${opponentName} bis ${deadlineStr} an.`
           : `Erinnerung: Trage dein Match gegen ${opponentName} bis ${deadlineStr} aus.`,
-      html: `<p>Erinnerung: ${kind === "accept" ? `Nimm die Forderung von ${opponentName}` : `Trage dein Match gegen ${opponentName} aus`} — Frist: ${deadlineStr}.</p>`,
+      html: `<p>Erinnerung: ${kind === "accept" ? `Nimm die Forderung von ${esc(opponentName)}` : `Trage dein Match gegen ${esc(opponentName)} aus`} — Frist: ${deadlineStr}.</p>`,
       linkPath: FORDERUNGEN_PATH,
     },
   );
@@ -259,7 +260,7 @@ export async function sendContactMessage(
     {
       subject: `Nachricht von ${fromName}`,
       text: message,
-      html: `<p><strong>${fromName}</strong> schreibt:</p><p>${message}</p>`,
+      html: `<p><strong>${esc(fromName)}</strong> schreibt:</p><p>${esc(message).replace(/\n/g, "<br>")}</p>`,
       linkPath: "/benachrichtigungen",
     },
   );

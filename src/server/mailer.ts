@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import { escapeHtml as esc } from "@/lib/html-escape";
 
 /**
  * Single shared SMTP transport + tiny plain-text/HTML templates for the
@@ -52,7 +53,7 @@ export async function sendVerificationEmail(to: string, firstName: string, rawTo
     `Hallo ${firstName},\n\nbitte bestätige deine E-Mail-Adresse: ${link}\n\nDer Link ist 3 Tage gültig.`,
     layout(
       "E-Mail-Adresse bestätigen",
-      `<p>Hallo ${firstName},</p>
+      `<p>Hallo ${esc(firstName)},</p>
        <p>bitte bestätige deine E-Mail-Adresse, um deine Registrierung abzuschließen:</p>
        <p><a href="${link}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">E-Mail bestätigen</a></p>
        <p>Der Link ist 3 Tage gültig.</p>`,
@@ -68,7 +69,7 @@ export async function sendPasswordResetEmail(to: string, firstName: string, rawT
     `Hallo ${firstName},\n\nsetze dein Passwort hier zurück: ${link}\n\nDer Link ist 1 Stunde gültig. Falls du das nicht angefordert hast, ignoriere diese E-Mail.`,
     layout(
       "Passwort zurücksetzen",
-      `<p>Hallo ${firstName},</p>
+      `<p>Hallo ${esc(firstName)},</p>
        <p>klicke auf den folgenden Link, um ein neues Passwort zu vergeben:</p>
        <p><a href="${link}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">Passwort zurücksetzen</a></p>
        <p>Der Link ist 1 Stunde gültig. Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>`,
@@ -84,7 +85,7 @@ export async function sendAdminApprovalNeededEmail(to: string, memberName: strin
     `${memberName} hat sich registriert und wartet auf Freigabe: ${link}`,
     layout(
       "Neue Registrierung wartet auf Freigabe",
-      `<p><strong>${memberName}</strong> hat sich registriert und wartet auf Freigabe.</p>
+      `<p><strong>${esc(memberName)}</strong> hat sich registriert und wartet auf Freigabe.</p>
        <p><a href="${link}">Zur Mitgliederverwaltung</a></p>`,
     ),
   );
@@ -120,8 +121,8 @@ export async function sendMemberApprovedEmail(to: string, firstName: string, div
     `Hallo ${firstName},\n\ndu bist jetzt Teil der ${divisionName}-Pyramide: ${link}`,
     layout(
       "Willkommen in der Pyramide",
-      `<p>Hallo ${firstName},</p>
-       <p>dein Konto wurde freigeschaltet und du bist ab sofort Teil der <strong>${divisionName}</strong>-Pyramide.</p>
+      `<p>Hallo ${esc(firstName)},</p>
+       <p>dein Konto wurde freigeschaltet und du bist ab sofort Teil der <strong>${esc(divisionName)}</strong>-Pyramide.</p>
        <p><a href="${link}">Zu deinem Profil</a></p>`,
     ),
   );

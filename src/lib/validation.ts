@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-// Shared between client-side forms (react-hook-form + zodResolver) and the
-// server actions that ultimately enforce them — one source of truth so a
-// relaxed client check can never be the only line of defense.
+// Shared between the client forms (plain <form action={serverAction}> +
+// useActionState, see src/lib/form-state.ts) and the server actions that
+// ultimately enforce them — one source of truth so a relaxed client check
+// can never be the only line of defense.
 
 export const emailSchema = z.string().trim().toLowerCase().email("Ungültige E-Mail-Adresse");
 
@@ -11,10 +12,22 @@ export const passwordSchema = z
   .min(8, "Mindestens 8 Zeichen")
   .max(200, "Maximal 200 Zeichen");
 
+// No newlines/control characters — names get interpolated into email
+// Subject headers (src/server/mailer.ts, notifications.ts), and while
+// nodemailer sanitizes those, rejecting control characters at the source is
+// cheaper than reasoning about it downstream.
+const nameSchema = (requiredMessage: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, requiredMessage)
+    .max(100)
+    .refine((v) => !/[\r\n\t]/.test(v), "Ungültige Zeichen");
+
 export const registerSchema = z
   .object({
-    firstName: z.string().trim().min(1, "Vorname erforderlich").max(100),
-    lastName: z.string().trim().min(1, "Nachname erforderlich").max(100),
+    firstName: nameSchema("Vorname erforderlich"),
+    lastName: nameSchema("Nachname erforderlich"),
     email: emailSchema,
     password: passwordSchema,
     passwordConfirm: z.string(),
