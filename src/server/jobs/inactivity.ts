@@ -6,12 +6,27 @@ import { getActiveSeason } from "@/server/seasons";
 import { divisionSettingsSchema } from "@/lib/settings";
 import { notifyInactivityWarning, notifyPositionChange } from "@/server/notifications";
 import { swapMemberPositions } from "@/server/position-swap";
+import { maxDate } from "@/lib/dates";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 /** Grace period after the warning before an actual demotion (PLAN.md §8.5: "Warnung, danach Abstieg" — the plan doesn't pin down how much later, so one extra week). */
 const GRACE_WEEKS_AFTER_WARNING = 1;
 
-async function getLastActivityDate(seasonId: string, memberId: string): Promise<Date> {
+/**
+ * `positionSince` (positions.since, always set — defaultNow() at insert) is
+ * the required fallback baseline, not an optional nicety: an earlier
+ * version of this fell back to the Unix epoch when neither a resolved
+ * challenge nor a position_history row existed, which — caught by actually
+ * running the seeded app against a real DB — silently demoted every member
+ * on the very first tick after a data path that skipped writing
+ * position_history (it turned out src/db/seed.ts was exactly such a path;
+ * now fixed there too, but this fallback stays as the real safety net).
+ */
+async function getLastActivityDate(
+  seasonId: string,
+  memberId: string,
+  positionSince: Date,
+): Promise<Date> {
   const [lastChallenge, lastHistoryEntry] = await Promise.all([
     db.query.challenges.findFirst({
       where: and(
@@ -27,15 +42,7 @@ async function getLastActivityDate(seasonId: string, memberId: string): Promise<
     }),
   ]);
 
-  const dates = [lastChallenge?.resolvedAt, lastHistoryEntry?.createdAt].filter(
-    (d): d is Date => !!d,
-  );
-  // Every member gets a position_history row when seeded or when they join
-  // mid-season (src/server/seasons.ts, src/server/members.ts), so this
-  // should never be empty in practice — the epoch fallback just avoids a
-  // crash if it somehow is, rather than skipping the member silently.
-  if (dates.length === 0) return new Date(0);
-  return new Date(Math.max(...dates.map((d) => d.getTime())));
+  return maxDate(lastChallenge?.resolvedAt, lastHistoryEntry?.createdAt, positionSince);
 }
 
 async function hasRecentWarning(memberId: string, since: Date): Promise<boolean> {
@@ -93,10 +100,10 @@ async function checkSeason(seasonId: string) {
 
   const now = new Date();
 
-  for (const { member } of rows) {
+  for (const { position, member } of rows) {
     if (member.onLeaveUntil && member.onLeaveUntil > now) continue;
 
-    const lastActivity = await getLastActivityDate(seasonId, member.id);
+    const lastActivity = await getLastActivityDate(seasonId, member.id, position.since);
     const weeksInactive = (now.getTime() - lastActivity.getTime()) / MS_PER_WEEK;
 
     if (weeksInactive < settings.inactivityWeeks) continue;

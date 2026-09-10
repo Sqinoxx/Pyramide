@@ -6,6 +6,7 @@ import {
   divisions,
   seasons,
   positions,
+  positionHistory,
   memberItn,
   itnImports,
   itnRecords,
@@ -242,13 +243,31 @@ async function main() {
       tiebreak: i, // stable order for members without an ITN (registration order)
     }));
     const assignment = seedPyramid(entries);
+    const assigned = Array.from(assignment.entries());
 
     await db.insert(positions).values(
-      Array.from(assignment.entries()).map(([memberId, pos]) => ({
+      assigned.map(([memberId, pos]) => ({
         seasonId: season.id,
         memberId,
         row: pos.row,
         slot: pos.slot,
+      })),
+    );
+
+    // Mirrors src/server/seasons.ts's startSeason() — without this, a fresh
+    // member has no position_history baseline at all, and the inactivity
+    // job's getLastActivityDate() falls back to positions.since (still
+    // fine) or, if that were ever also missing, the epoch — instantly
+    // "inactive" by 50+ years. Found by actually running the seeded app.
+    await db.insert(positionHistory).values(
+      assigned.map(([memberId, pos]) => ({
+        seasonId: season.id,
+        memberId,
+        fromRow: null,
+        fromSlot: null,
+        toRow: pos.row,
+        toSlot: pos.slot,
+        reason: "seed" as const,
       })),
     );
 

@@ -8,8 +8,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-pyramide}
     ports:
       # Bound to loopback only — lets you `psql`/pgAdmin from the host for
-      # debugging without exposing Postgres to the network. Remove if not needed.
-      - "127.0.0.1:5432:5432"
+      # debugging without exposing Postgres to the network. Host port is
+      # 5433 (not 5432) to avoid clashing with any other local Postgres.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,6 +31,12 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pyramide}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pyramide}
+    ports:
+      # Loopback-only, same rationale as postgres's 5433 above: lets you hit
+      # the app directly (plain HTTP, no Caddy/HTTPS/self-signed cert) for
+      # local debugging without exposing it to the network. Caddy on 80/443
+      # remains the only externally reachable entry point.
+      - "127.0.0.1:3000:3000"
     networks: [internal, web]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -41,7 +48,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["node", "dist-server/worker.js"]
+    # Also runs migrate.js first, same as the app service's default CMD:
+    # `depends_on: postgres healthy` only means Postgres itself is up, not
+    # that the schema exists yet, and app/worker start in parallel — without
+    # this, a fresh `docker compose up` has the worker hitting
+    # "relation does not exist" until app's migration finishes (found by
+    # actually running a clean `docker compose up` end to end). migrate.js
+    # is idempotent, so running it from both containers on startup is safe.
+    command: ["sh", "-c", "node dist-server/migrate.js && node dist-server/worker.js"]
     restart: unless-stopped
     depends_on:
       postgres:

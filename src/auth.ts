@@ -38,6 +38,13 @@ type AppJWT = { id: string; role: "member" | "admin" };
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // Auth.js only trusts the incoming Host header by default on Vercel;
+  // everywhere else (this app: Docker behind Caddy, per PLAN.md §11) it
+  // rejects every request with "UntrustedHost" unless told otherwise. Safe
+  // here because Caddy is the only thing that can reach the app container
+  // (see docker-compose.yml's network split) and terminates TLS itself, so
+  // there's no untrusted edge forging the Host header directly at the app.
+  trustHost: true,
   providers: [
     Credentials({
       credentials: { email: {}, password: {} },

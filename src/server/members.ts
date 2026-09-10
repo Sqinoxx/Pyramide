@@ -73,7 +73,13 @@ export async function registerMember(input: RegisterInput) {
   });
 
   const rawToken = await createVerificationToken(user.email, "verify-email");
-  await sendVerificationEmail(user.email, member.firstName, rawToken);
+  // The account (and its verification token) already exist at this point —
+  // an SMTP hiccup here must not turn into "Registrierung fehlgeschlagen"
+  // and leave a real account the user can't get back to. They can request
+  // a new link via resendVerificationEmail() below.
+  await sendVerificationEmail(user.email, member.firstName, rawToken).catch((err) => {
+    console.error("[register] verification email failed to send", err);
+  });
 
   const admins = await db.query.users.findMany({ where: eq(users.role, "admin") });
   await Promise.all(
@@ -363,4 +369,25 @@ export async function listActiveMembers(query?: string) {
       m.lastName.toLowerCase().includes(q) ||
       m.club?.toLowerCase().includes(q),
   );
+}
+
+/**
+ * Re-sends the verification link — the gap this closes: registerMember()
+ * creates the account before attempting to send that first email, so an
+ * SMTP outage (or the mail landing in spam) previously left a real,
+ * permanently-unverifiable account with no recovery path. Always resolves
+ * without revealing whether the address is registered or already verified,
+ * for the same reason password-reset requests don't reveal that either.
+ */
+export async function resendVerificationEmail(email: string) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email),
+    with: { member: true },
+  });
+  if (!user || user.emailVerifiedAt) return;
+
+  const rawToken = await createVerificationToken(user.email, "verify-email");
+  await sendVerificationEmail(user.email, user.member?.firstName ?? "", rawToken).catch((err) => {
+    console.error("[resend-verification] send failed", err);
+  });
 }

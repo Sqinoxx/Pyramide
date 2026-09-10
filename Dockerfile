@@ -10,6 +10,15 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# `next build` statically analyzes every route (including API routes like
+# /api/health) to decide static-vs-dynamic rendering, which imports
+# src/db/index.ts — and that throws immediately if DATABASE_URL is unset, so
+# the build needs *some* syntactically valid value even though no query ever
+# actually runs at build time (postgres.js connects lazily). The real value
+# comes from docker-compose.yml's `environment:`/`env_file:` at container
+# start, which overrides this build-time-only placeholder.
+ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
+ENV DATABASE_URL=$DATABASE_URL
 RUN npm run build \
   && npm run build:server
 

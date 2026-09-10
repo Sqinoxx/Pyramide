@@ -578,6 +578,19 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
   sets: many(matchSets),
 }));
 
+// Drizzle's relational query API (db.query.x.findMany({ with: {...} }))
+// needs both sides of a relation declared explicitly — matchesRelations
+// alone wasn't enough for `with: { match: { with: { sets: true } } }`
+// (used by listChallengesForMember/listRecentResults in challenges.ts) to
+// resolve at runtime, even though the FK itself is fine. Only surfaced by
+// actually running a query against a real database.
+export const matchSetsRelations = relations(matchSets, ({ one }) => ({
+  match: one(matches, {
+    fields: [matchSets.matchId],
+    references: [matches.id],
+  }),
+}));
+
 export const itnRecordsRelations = relations(itnRecords, ({ one }) => ({
   import: one(itnImports, {
     fields: [itnRecords.importId],
