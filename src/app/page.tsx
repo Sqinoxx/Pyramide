@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
+import { getMemberByUserId } from "@/server/members";
+import { getEligibleDefenders } from "@/server/challenges";
 import { PyramidView } from "@/components/PyramidView";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
@@ -17,6 +20,18 @@ export default async function Home({
 
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
+
+  const session = await auth();
+  let viewerMemberId: string | undefined;
+  let eligibleMemberIds: Set<string> | undefined;
+  if (session?.user && view) {
+    const member = await getMemberByUserId(session.user.id);
+    if (member && member.divisionId === division!.id) {
+      viewerMemberId = member.id;
+      const eligible = await getEligibleDefenders(view.season.id, member.id);
+      eligibleMemberIds = new Set(eligible.map((e) => e.memberId));
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 py-12">
@@ -47,7 +62,12 @@ export default async function Home({
       </div>
 
       {view ? (
-        <PyramidView rows={view.rows} />
+        <PyramidView
+          rows={view.rows}
+          seasonId={view.season.id}
+          viewerMemberId={viewerMemberId}
+          eligibleMemberIds={eligibleMemberIds}
+        />
       ) : (
         <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Für {DIVISION_LABEL[active]} wurde noch keine Pyramide gestartet.

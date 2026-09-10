@@ -1,5 +1,6 @@
 import type { PyramidRow } from "@/server/seasons";
 import { formatItnBadge } from "@/lib/itn-precedence";
+import { createChallengeAction } from "@/app/forderungen/actions";
 
 function groupByRow(rows: PyramidRow[]): PyramidRow[][] {
   const maxRow = rows.reduce((max, r) => Math.max(max, r.row), 0);
@@ -9,7 +10,17 @@ function groupByRow(rows: PyramidRow[]): PyramidRow[][] {
   return grouped;
 }
 
-export function PyramidView({ rows }: { rows: PyramidRow[] }) {
+export function PyramidView({
+  rows,
+  seasonId,
+  viewerMemberId,
+  eligibleMemberIds,
+}: {
+  rows: PyramidRow[];
+  seasonId?: string;
+  viewerMemberId?: string;
+  eligibleMemberIds?: Set<string>;
+}) {
   if (rows.length === 0) {
     return (
       <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
@@ -25,21 +36,42 @@ export function PyramidView({ rows }: { rows: PyramidRow[] }) {
       <div className="flex min-w-max flex-col items-center gap-2 px-4">
         {byRow.map((row, i) => (
           <div key={i} className="flex gap-2">
-            {row.map((entry) => (
-              <div
-                key={entry.memberId}
-                className="flex w-36 flex-col items-center justify-center rounded-md border border-zinc-200 bg-white px-2 py-2 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {entry.firstName} {entry.lastName}
-                </span>
-                {entry.itn && entry.showItnPublicly && (
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {formatItnBadge(entry.itn)}
+            {row.map((entry) => {
+              const isSelf = entry.memberId === viewerMemberId;
+              const canChallenge = !isSelf && eligibleMemberIds?.has(entry.memberId);
+              return (
+                <div
+                  key={entry.memberId}
+                  className={
+                    "flex w-36 flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-center shadow-sm " +
+                    (isSelf
+                      ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
+                      : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900")
+                  }
+                >
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {entry.firstName} {entry.lastName}
                   </span>
-                )}
-              </div>
-            ))}
+                  {entry.itn && entry.showItnPublicly && (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {formatItnBadge(entry.itn)}
+                    </span>
+                  )}
+                  {canChallenge && seasonId && (
+                    <form action={createChallengeAction}>
+                      <input type="hidden" name="seasonId" value={seasonId} />
+                      <input type="hidden" name="defenderId" value={entry.memberId} />
+                      <button
+                        type="submit"
+                        className="mt-1 rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      >
+                        Fordern
+                      </button>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

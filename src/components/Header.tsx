@@ -12,6 +12,9 @@ export async function Header() {
       <nav className="flex items-center gap-4 text-sm">
         {session?.user ? (
           <>
+            <Link href="/forderungen" className="text-zinc-700 hover:underline dark:text-zinc-300">
+              Forderungen
+            </Link>
             <Link href="/profil" className="text-zinc-700 hover:underline dark:text-zinc-300">
               Profil
             </Link>
@@ -40,6 +43,12 @@ export async function Header() {
                   className="text-zinc-700 hover:underline dark:text-zinc-300"
                 >
                   Saison
+                </Link>
+                <Link
+                  href="/admin/forderungen"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Streitfälle
                 </Link>
               </>
             )}

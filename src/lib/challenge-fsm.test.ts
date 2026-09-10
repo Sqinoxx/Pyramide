@@ -56,6 +56,20 @@ describe("challenge state machine", () => {
     });
   });
 
+  it("an admin can cancel a disputed challenge without declaring a winner", () => {
+    expect(transition("disputed", { type: "admin_cancel" })).toEqual({
+      state: "settled",
+      resolution: "cancelled",
+    });
+  });
+
+  it("an admin can cancel an expired-play challenge without a winner", () => {
+    expect(transition("expired_play", { type: "admin_cancel" })).toEqual({
+      state: "settled",
+      resolution: "cancelled",
+    });
+  });
+
   it("rejects events that don't apply to the current state", () => {
     expect(() => transition("proposed", { type: "confirm" })).toThrow(
       InvalidTransitionError,

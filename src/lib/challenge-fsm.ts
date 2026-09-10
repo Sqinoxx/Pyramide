@@ -31,6 +31,7 @@ export type Event =
   | { type: "confirm" }
   | { type: "dispute" }
   | { type: "admin_resolve"; winner: "challenger" | "defender" }
+  | { type: "admin_cancel" }
   | { type: "play_deadline_passed" }
   | { type: "report_confirm_deadline_passed" };
 
@@ -96,9 +97,15 @@ export function transition(
       if (event.type === "admin_resolve") {
         return { state: "settled", resolution: "played", winner: event.winner };
       }
+      if (event.type === "admin_cancel") {
+        return { state: "settled", resolution: "cancelled" };
+      }
       break;
 
     case "expired_play":
+      if (event.type === "admin_cancel") {
+        return { state: "settled", resolution: "cancelled" };
+      }
       if (event.type === "admin_resolve") {
         return {
           state: "settled",

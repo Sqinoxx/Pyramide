@@ -1,0 +1,489 @@
+import "server-only";
+import { and, eq, inArray, or } from "drizzle-orm";
+import { db } from "@/db";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
+import {
+  challenges,
+  matches,
+  matchSets,
+  members,
+  positions,
+  positionHistory,
+  seasons,
+} from "@/db/schema";
+import { isEligibleChallenge, swapPositions, type Position } from "@/lib/pyramid";
+import {
+  transition,
+  InvalidTransitionError,
+  type ChallengeState,
+  type Event as ChallengeEvent,
+} from "@/lib/challenge-fsm";
+import { divisionSettingsSchema, type DivisionSettings } from "@/lib/settings";
+import { determineWinnerFromSets, type SetScore } from "@/lib/match-result";
+import * as schema from "@/db/schema";
+
+type Tx = PgTransaction<
+  PostgresJsQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+
+const OPEN_STATES: ChallengeState[] = [
+  "proposed",
+  "accepted",
+  "reported",
+  "disputed",
+  "expired_accept",
+  "expired_play",
+];
+
+export class ChallengeError extends Error {}
+
+/**
+ * Thin wrapper around the pure transition() so every public function here
+ * only ever throws ChallengeError — callers (the server actions) then have
+ * one error type to catch instead of also needing to know about
+ * InvalidTransitionError from the FSM module.
+ */
+function safeTransition(state: ChallengeState, event: ChallengeEvent) {
+  try {
+    return transition(state, event);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      throw new ChallengeError("Diese Aktion ist in diesem Status nicht mehr möglich.");
+    }
+    throw err;
+  }
+}
+
+async function getSeasonSettings(seasonId: string): Promise<DivisionSettings> {
+  const season = await db.query.seasons.findFirst({ where: eq(seasons.id, seasonId) });
+  if (!season) throw new ChallengeError("Season not found");
+  return divisionSettingsSchema.parse(season.settings ?? {});
+}
+
+async function getPosition(seasonId: string, memberId: string): Promise<Position | null> {
+  const pos = await db.query.positions.findFirst({
+    where: and(eq(positions.seasonId, seasonId), eq(positions.memberId, memberId)),
+  });
+  return pos ? { row: pos.row, slot: pos.slot } : null;
+}
+
+/**
+ * Members the given member is currently allowed to challenge: geometry
+ * (PLAN.md §4.2) plus the stateful checks (status, open challenges,
+ * cooldowns). Used both to render the "fordern" UI and re-checked in full
+ * by createChallenge() — never trust a list rendered a few seconds ago.
+ */
+export async function getEligibleDefenders(seasonId: string, challengerId: string) {
+  const settings = await getSeasonSettings(seasonId);
+  const challengerPos = await getPosition(seasonId, challengerId);
+  if (!challengerPos) return [];
+
+  const rows = await db
+    .select({ position: positions, member: members })
+    .from(positions)
+    .innerJoin(members, eq(positions.memberId, members.id))
+    .where(eq(positions.seasonId, seasonId));
+
+  const now = new Date();
+  const eligible: { memberId: string; firstName: string; lastName: string; row: number; slot: number }[] = [];
+
+  for (const { position, member } of rows) {
+    if (member.id === challengerId) continue;
+    if (member.status !== "active") continue;
+    if (member.onLeaveUntil && member.onLeaveUntil > now) continue;
+    if (!isEligibleChallenge(challengerPos, { row: position.row, slot: position.slot }, settings)) continue;
+
+    if (await hasOpenChallenge(seasonId, member.id)) continue;
+    if (await isInCooldown(seasonId, challengerId, member.id, settings)) continue;
+
+    eligible.push({
+      memberId: member.id,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      row: position.row,
+      slot: position.slot,
+    });
+  }
+
+  return eligible;
+}
+
+async function hasOpenChallenge(seasonId: string, memberId: string): Promise<boolean> {
+  const existing = await db.query.challenges.findFirst({
+    where: and(
+      eq(challenges.seasonId, seasonId),
+      or(eq(challenges.challengerId, memberId), eq(challenges.defenderId, memberId)),
+      inArray(challenges.state, OPEN_STATES),
+    ),
+  });
+  return !!existing;
+}
+
+async function isInCooldown(
+  seasonId: string,
+  memberAId: string,
+  memberBId: string,
+  settings: DivisionSettings,
+): Promise<boolean> {
+  const lastBetweenThem = await db.query.challenges.findFirst({
+    where: and(
+      eq(challenges.seasonId, seasonId),
+      or(
+        and(eq(challenges.challengerId, memberAId), eq(challenges.defenderId, memberBId)),
+        and(eq(challenges.challengerId, memberBId), eq(challenges.defenderId, memberAId)),
+      ),
+      eq(challenges.state, "settled"),
+    ),
+    orderBy: (c, { desc }) => [desc(c.resolvedAt)],
+  });
+  if (lastBetweenThem?.resolvedAt) {
+    const cooldownEnd = addDays(lastBetweenThem.resolvedAt, settings.rematchCooldownDays);
+    if (cooldownEnd > new Date()) return true;
+  }
+
+  const lastForEither = await db.query.challenges.findFirst({
+    where: and(
+      eq(challenges.seasonId, seasonId),
+      or(
+        eq(challenges.challengerId, memberAId),
+        eq(challenges.defenderId, memberAId),
+        eq(challenges.challengerId, memberBId),
+        eq(challenges.defenderId, memberBId),
+      ),
+      eq(challenges.state, "settled"),
+    ),
+    orderBy: (c, { desc }) => [desc(c.resolvedAt)],
+  });
+  if (lastForEither?.resolvedAt) {
+    const cooldownEnd = addDays(lastForEither.resolvedAt, settings.postMatchCooldownDays);
+    if (cooldownEnd > new Date()) return true;
+  }
+
+  return false;
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+export async function createChallenge(seasonId: string, challengerId: string, defenderId: string) {
+  if (challengerId === defenderId) throw new ChallengeError("Man kann sich nicht selbst fordern.");
+
+  const settings = await getSeasonSettings(seasonId);
+  const [challengerPos, defenderPos] = await Promise.all([
+    getPosition(seasonId, challengerId),
+    getPosition(seasonId, defenderId),
+  ]);
+  if (!challengerPos || !defenderPos) {
+    throw new ChallengeError("Position nicht gefunden.");
+  }
+  if (!isEligibleChallenge(challengerPos, defenderPos, settings)) {
+    throw new ChallengeError("Diese Forderung ist nach den Pyramidenregeln nicht erlaubt.");
+  }
+  if (await hasOpenChallenge(seasonId, challengerId)) {
+    throw new ChallengeError("Du hast bereits eine offene Forderung.");
+  }
+  if (await hasOpenChallenge(seasonId, defenderId)) {
+    throw new ChallengeError("Diese Person hat bereits eine offene Forderung.");
+  }
+  if (await isInCooldown(seasonId, challengerId, defenderId, settings)) {
+    throw new ChallengeError("Diese Paarung ist aktuell in der Sperrfrist.");
+  }
+
+  const now = new Date();
+  try {
+    const [challenge] = await db
+      .insert(challenges)
+      .values({
+        seasonId,
+        challengerId,
+        defenderId,
+        state: "proposed",
+        proposedAt: now,
+        acceptDeadline: addDays(now, settings.acceptDeadlineDays),
+      })
+      .returning();
+
+    return challenge;
+  } catch (err) {
+    // Backstop for the race between the hasOpenChallenge() checks above and
+    // this insert: drizzle/0001_partial_indexes.sql enforces "at most one
+    // open challenge per member" at the database level too, so a concurrent
+    // request landing in that gap fails here instead of corrupting state.
+    if (isUniqueViolation(err)) {
+      throw new ChallengeError(
+        "Du oder die geforderte Person haben inzwischen bereits eine offene Forderung.",
+      );
+    }
+    throw err;
+  }
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+}
+
+async function requireChallenge(challengeId: string) {
+  const challenge = await db.query.challenges.findFirst({ where: eq(challenges.id, challengeId) });
+  if (!challenge) throw new ChallengeError("Forderung nicht gefunden.");
+  return challenge;
+}
+
+function requireParticipant(challenge: { challengerId: string; defenderId: string }, memberId: string) {
+  if (memberId !== challenge.challengerId && memberId !== challenge.defenderId) {
+    throw new ChallengeError("Du bist an dieser Forderung nicht beteiligt.");
+  }
+}
+
+export async function acceptChallenge(challengeId: string, memberId: string) {
+  const challenge = await requireChallenge(challengeId);
+  if (memberId !== challenge.defenderId) {
+    throw new ChallengeError("Nur die geforderte Person kann annehmen.");
+  }
+  const settings = await getSeasonSettings(challenge.seasonId);
+  const result = safeTransition(challenge.state as ChallengeState, { type: "accept" });
+
+  const now = new Date();
+  await db
+    .update(challenges)
+    .set({
+      state: result.state,
+      acceptedAt: now,
+      playDeadline: addDays(now, settings.playDeadlineDays),
+    })
+    .where(eq(challenges.id, challengeId));
+}
+
+export async function declineChallenge(challengeId: string, memberId: string, reason: string) {
+  const challenge = await requireChallenge(challengeId);
+  if (memberId !== challenge.defenderId) {
+    throw new ChallengeError("Nur die geforderte Person kann ablehnen.");
+  }
+  const settings = await getSeasonSettings(challenge.seasonId);
+  const validReason = !settings.declineForfeit;
+  const result = safeTransition(challenge.state as ChallengeState, { type: "decline", validReason });
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(challenges)
+      .set({
+        state: result.state,
+        resolution: result.resolution,
+        declineReason: reason || null,
+        resolvedAt: new Date(),
+      })
+      .where(eq(challenges.id, challengeId));
+
+    if (result.winner) {
+      await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, result.winner);
+    }
+  });
+}
+
+export async function reportResult(
+  challengeId: string,
+  reportedByMemberId: string,
+  sets: SetScore[],
+) {
+  const challenge = await requireChallenge(challengeId);
+  requireParticipant(challenge, reportedByMemberId);
+
+  const winnerSide = determineWinnerFromSets(sets);
+  const winnerId = winnerSide === "a" ? challenge.challengerId : challenge.defenderId;
+  const winnerRole = winnerId === challenge.challengerId ? "challenger" : "defender";
+  const result = safeTransition(challenge.state as ChallengeState, { type: "report", winner: winnerRole });
+
+  await db.transaction(async (tx) => {
+    const [match] = await tx
+      .insert(matches)
+      .values({
+        challengeId,
+        playedAt: new Date(),
+        winnerId,
+        reportedBy: reportedByMemberId,
+      })
+      .returning();
+
+    await tx.insert(matchSets).values(
+      sets.map((s, i) => ({
+        matchId: match.id,
+        setNo: i + 1,
+        gamesA: s.gamesA,
+        gamesB: s.gamesB,
+        tiebreakA: s.tiebreakA ?? null,
+        tiebreakB: s.tiebreakB ?? null,
+      })),
+    );
+
+    await tx.update(challenges).set({ state: result.state }).where(eq(challenges.id, challengeId));
+  });
+}
+
+export async function confirmResult(challengeId: string, confirmingMemberId: string) {
+  const challenge = await requireChallenge(challengeId);
+  requireParticipant(challenge, confirmingMemberId);
+
+  const match = await db.query.matches.findFirst({ where: eq(matches.challengeId, challengeId) });
+  if (!match) throw new ChallengeError("Kein Ergebnis zum Bestätigen gefunden.");
+  if (match.reportedBy === confirmingMemberId) {
+    throw new ChallengeError("Das gemeldete Ergebnis muss von der Gegenseite bestätigt werden.");
+  }
+
+  const result = safeTransition(challenge.state as ChallengeState, { type: "confirm" });
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(matches)
+      .set({ confirmedBy: confirmingMemberId, confirmedAt: new Date() })
+      .where(eq(matches.id, match.id));
+
+    await tx
+      .update(challenges)
+      .set({ state: result.state, resolution: "played", resolvedAt: new Date() })
+      .where(eq(challenges.id, challengeId));
+
+    const winnerRole = match.winnerId === challenge.challengerId ? "challenger" : "defender";
+    await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, winnerRole);
+  });
+}
+
+export async function disputeResult(challengeId: string, memberId: string) {
+  const challenge = await requireChallenge(challengeId);
+  requireParticipant(challenge, memberId);
+  const result = safeTransition(challenge.state as ChallengeState, { type: "dispute" });
+  await db.update(challenges).set({ state: result.state }).where(eq(challenges.id, challengeId));
+}
+
+/** Admin arbitration for a disputed or expired-play challenge. `winnerId: null` cancels without a swap. */
+export async function adminResolveChallenge(challengeId: string, winnerId: string | null) {
+  const challenge = await requireChallenge(challengeId);
+  const state = challenge.state as ChallengeState;
+
+  if (!winnerId) {
+    const result = safeTransition(state, { type: "admin_cancel" });
+    await db
+      .update(challenges)
+      .set({ state: result.state, resolution: result.resolution, resolvedAt: new Date() })
+      .where(eq(challenges.id, challengeId));
+    return;
+  }
+
+  requireParticipant(challenge, winnerId);
+  const winnerRole = winnerId === challenge.challengerId ? "challenger" : "defender";
+  const result = safeTransition(state, { type: "admin_resolve", winner: winnerRole });
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(challenges)
+      .set({ state: result.state, resolution: result.resolution, resolvedAt: new Date() })
+      .where(eq(challenges.id, challengeId));
+
+    await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, winnerRole);
+  });
+}
+
+/**
+ * Applies the position swap for a settled challenge (PLAN.md §4.3): only
+ * the challenger winning moves anyone — a defender win, by design, changes
+ * nothing but starts both players' cooldowns.
+ *
+ * Runs a 3-step temp-slot shuffle (park the challenger at (-1,-1), move the
+ * defender into the freed spot, then move the challenger into the
+ * defender's old spot) rather than a direct 2-row update, since the plain
+ * (non-deferrable) UNIQUE(season, row, slot) index would otherwise reject
+ * the intermediate state where both rows briefly share a value. The two
+ * SELECT ... FOR UPDATE locks above serialize concurrent swaps that touch
+ * either of *these* two rows; two unrelated swaps in the same season
+ * landing on (-1,-1) at the exact same instant would abort with a unique
+ * violation instead of corrupting anything — acceptable at club-roster
+ * concurrency, and safe to just retry.
+ */
+async function settlePosition(
+  tx: Tx,
+  seasonId: string,
+  challengeId: string,
+  challengerId: string,
+  defenderId: string,
+  winnerRole: "challenger" | "defender",
+) {
+  if (winnerRole !== "challenger") return;
+
+  const [challengerRow] = await tx
+    .select()
+    .from(positions)
+    .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, challengerId)))
+    .for("update");
+  const [defenderRow] = await tx
+    .select()
+    .from(positions)
+    .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, defenderId)))
+    .for("update");
+  if (!challengerRow || !defenderRow) throw new ChallengeError("Position nicht gefunden.");
+
+  const [newChallenger, newDefender] = swapPositions(
+    { memberId: challengerId, position: { row: challengerRow.row, slot: challengerRow.slot } },
+    { memberId: defenderId, position: { row: defenderRow.row, slot: defenderRow.slot } },
+  );
+
+  await tx.update(positions).set({ row: -1, slot: -1 }).where(eq(positions.id, challengerRow.id));
+  await tx
+    .update(positions)
+    .set({ row: newDefender.position.row, slot: newDefender.position.slot, since: new Date() })
+    .where(eq(positions.id, defenderRow.id));
+  await tx
+    .update(positions)
+    .set({ row: newChallenger.position.row, slot: newChallenger.position.slot, since: new Date() })
+    .where(eq(positions.id, challengerRow.id));
+
+  await tx.insert(positionHistory).values([
+    {
+      seasonId,
+      memberId: challengerId,
+      fromRow: challengerRow.row,
+      fromSlot: challengerRow.slot,
+      toRow: newChallenger.position.row,
+      toSlot: newChallenger.position.slot,
+      reason: "challenge_win",
+      challengeId,
+    },
+    {
+      seasonId,
+      memberId: defenderId,
+      fromRow: defenderRow.row,
+      fromSlot: defenderRow.slot,
+      toRow: newDefender.position.row,
+      toSlot: newDefender.position.slot,
+      reason: "swap_loss",
+      challengeId,
+    },
+  ]);
+}
+
+export async function listChallengesForMember(seasonId: string, memberId: string) {
+  return db.query.challenges.findMany({
+    where: and(
+      eq(challenges.seasonId, seasonId),
+      or(eq(challenges.challengerId, memberId), eq(challenges.defenderId, memberId)),
+    ),
+    orderBy: (c, { desc }) => [desc(c.proposedAt)],
+    with: { challenger: true, defender: true, match: { with: { sets: true } } },
+  });
+}
+
+/** For the admin arbitration queue (/admin/forderungen). */
+export async function listDisputedChallenges() {
+  return db.query.challenges.findMany({
+    where: eq(challenges.state, "disputed"),
+    orderBy: (c, { asc }) => [asc(c.proposedAt)],
+    with: {
+      challenger: true,
+      defender: true,
+      match: { with: { sets: true } },
+      season: { with: { division: true } },
+    },
+  });
+}
