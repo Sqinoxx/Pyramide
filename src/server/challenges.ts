@@ -1,19 +1,8 @@
 import "server-only";
-import { and, eq, inArray, lt, or } from "drizzle-orm";
+import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import type { PgTransaction } from "drizzle-orm/pg-core";
-import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
-import {
-  challenges,
-  matches,
-  matchSets,
-  members,
-  positions,
-  positionHistory,
-  seasons,
-} from "@/db/schema";
-import { isEligibleChallenge, swapPositions, type Position } from "@/lib/pyramid";
+import { challenges, matches, matchSets, members, positions, seasons } from "@/db/schema";
+import { isEligibleChallenge, type Position } from "@/lib/pyramid";
 import {
   transition,
   InvalidTransitionError,
@@ -31,13 +20,8 @@ import {
   notifyResultReported,
   notifyWalkover,
 } from "./notifications";
-import * as schema from "@/db/schema";
-
-type Tx = PgTransaction<
-  PostgresJsQueryResultHKT,
-  typeof schema,
-  ExtractTablesWithRelations<typeof schema>
->;
+import { swapMemberPositions } from "./position-swap";
+import type { Tx } from "./db-types";
 
 const OPEN_STATES: ChallengeState[] = [
   "proposed",
@@ -90,6 +74,9 @@ export async function getEligibleDefenders(seasonId: string, challengerId: strin
   const settings = await getSeasonSettings(seasonId);
   const challengerPos = await getPosition(seasonId, challengerId);
   if (!challengerPos) return [];
+
+  const challenger = await db.query.members.findFirst({ where: eq(members.id, challengerId) });
+  if (challenger?.onLeaveUntil && challenger.onLeaveUntil > new Date()) return [];
 
   const rows = await db
     .select({ position: positions, member: members })
@@ -193,6 +180,17 @@ export async function createChallenge(seasonId: string, challengerId: string, de
   if (!isEligibleChallenge(challengerPos, defenderPos, settings)) {
     throw new ChallengeError("Diese Forderung ist nach den Pyramidenregeln nicht erlaubt.");
   }
+  const [challengerMember, defenderMember] = await Promise.all([
+    db.query.members.findFirst({ where: eq(members.id, challengerId) }),
+    db.query.members.findFirst({ where: eq(members.id, defenderId) }),
+  ]);
+  const now = new Date();
+  if (challengerMember?.onLeaveUntil && challengerMember.onLeaveUntil > now) {
+    throw new ChallengeError("Du bist im Urlaubsmodus und kannst aktuell nicht fordern.");
+  }
+  if (defenderMember?.onLeaveUntil && defenderMember.onLeaveUntil > now) {
+    throw new ChallengeError("Diese Person ist im Urlaubsmodus und kann aktuell nicht gefordert werden.");
+  }
   if (await hasOpenChallenge(seasonId, challengerId)) {
     throw new ChallengeError("Du hast bereits eine offene Forderung.");
   }
@@ -203,7 +201,6 @@ export async function createChallenge(seasonId: string, challengerId: string, de
     throw new ChallengeError("Diese Paarung ist aktuell in der Sperrfrist.");
   }
 
-  const now = new Date();
   try {
     const [challenge] = await db
       .insert(challenges)
@@ -467,18 +464,9 @@ export async function adminResolveChallenge(challengeId: string, winnerId: strin
 /**
  * Applies the position swap for a settled challenge (PLAN.md §4.3): only
  * the challenger winning moves anyone — a defender win, by design, changes
- * nothing but starts both players' cooldowns.
- *
- * Runs a 3-step temp-slot shuffle (park the challenger at (-1,-1), move the
- * defender into the freed spot, then move the challenger into the
- * defender's old spot) rather than a direct 2-row update, since the plain
- * (non-deferrable) UNIQUE(season, row, slot) index would otherwise reject
- * the intermediate state where both rows briefly share a value. The two
- * SELECT ... FOR UPDATE locks above serialize concurrent swaps that touch
- * either of *these* two rows; two unrelated swaps in the same season
- * landing on (-1,-1) at the exact same instant would abort with a unique
- * violation instead of corrupting anything — acceptable at club-roster
- * concurrency, and safe to just retry.
+ * nothing but starts both players' cooldowns. The actual swap mechanics
+ * (and why they need a 3-step shuffle) live in src/server/position-swap.ts,
+ * shared with the inactivity-demotion and admin-correction call sites.
  */
 async function settlePosition(
   tx: Tx,
@@ -490,55 +478,13 @@ async function settlePosition(
 ) {
   if (winnerRole !== "challenger") return;
 
-  const [challengerRow] = await tx
-    .select()
-    .from(positions)
-    .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, challengerId)))
-    .for("update");
-  const [defenderRow] = await tx
-    .select()
-    .from(positions)
-    .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, defenderId)))
-    .for("update");
-  if (!challengerRow || !defenderRow) throw new ChallengeError("Position nicht gefunden.");
-
-  const [newChallenger, newDefender] = swapPositions(
-    { memberId: challengerId, position: { row: challengerRow.row, slot: challengerRow.slot } },
-    { memberId: defenderId, position: { row: defenderRow.row, slot: defenderRow.slot } },
+  const result = await swapMemberPositions(
+    tx,
+    seasonId,
+    { memberId: challengerId, reason: "challenge_win", challengeId },
+    { memberId: defenderId, reason: "swap_loss", challengeId },
   );
-
-  await tx.update(positions).set({ row: -1, slot: -1 }).where(eq(positions.id, challengerRow.id));
-  await tx
-    .update(positions)
-    .set({ row: newDefender.position.row, slot: newDefender.position.slot, since: new Date() })
-    .where(eq(positions.id, defenderRow.id));
-  await tx
-    .update(positions)
-    .set({ row: newChallenger.position.row, slot: newChallenger.position.slot, since: new Date() })
-    .where(eq(positions.id, challengerRow.id));
-
-  await tx.insert(positionHistory).values([
-    {
-      seasonId,
-      memberId: challengerId,
-      fromRow: challengerRow.row,
-      fromSlot: challengerRow.slot,
-      toRow: newChallenger.position.row,
-      toSlot: newChallenger.position.slot,
-      reason: "challenge_win",
-      challengeId,
-    },
-    {
-      seasonId,
-      memberId: defenderId,
-      fromRow: defenderRow.row,
-      fromSlot: defenderRow.slot,
-      toRow: newDefender.position.row,
-      toSlot: newDefender.position.slot,
-      reason: "swap_loss",
-      challengeId,
-    },
-  ]);
+  if (!result) throw new ChallengeError("Position nicht gefunden.");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -648,6 +594,20 @@ export async function autoConfirmResult(challengeId: string) {
     await notifyPositionChange(challenge.challengerId, "up", "Ergebnis automatisch bestätigt");
     await notifyPositionChange(challenge.defenderId, "down", "Ergebnis automatisch bestätigt");
   }
+}
+
+/** Recent settled results for the public feed (PLAN.md v1 "Ergebnis-Feed") — excludes admin-cancelled challenges, which have no winner to show. */
+export async function listRecentResults(seasonId: string, limit = 30) {
+  return db.query.challenges.findMany({
+    where: and(
+      eq(challenges.seasonId, seasonId),
+      eq(challenges.state, "settled"),
+      ne(challenges.resolution, "cancelled"),
+    ),
+    orderBy: (c, { desc }) => [desc(c.resolvedAt)],
+    limit,
+    with: { challenger: true, defender: true, match: { with: { sets: true } } },
+  });
 }
 
 export async function listChallengesForMember(seasonId: string, memberId: string) {

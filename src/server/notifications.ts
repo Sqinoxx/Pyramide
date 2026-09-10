@@ -239,3 +239,28 @@ export async function countUnreadNotifications(memberId: string): Promise<number
     .where(and(eq(notifications.memberId, memberId), sql`${notifications.readAt} is null`));
   return row?.count ?? 0;
 }
+
+/**
+ * The "Kontaktmöglichkeit ohne Preisgabe von Telefonnummern" from PLAN.md
+ * v1: routes a short message through the existing notification/email
+ * pipeline instead of exposing either side's phone number or email address
+ * to the other.
+ */
+export async function sendContactMessage(
+  fromMemberId: string,
+  toMemberId: string,
+  fromName: string,
+  message: string,
+) {
+  await notify(
+    toMemberId,
+    "direct_message",
+    { fromMemberId, fromName, message },
+    {
+      subject: `Nachricht von ${fromName}`,
+      text: message,
+      html: `<p><strong>${fromName}</strong> schreibt:</p><p>${message}</p>`,
+      linkPath: "/benachrichtigungen",
+    },
+  );
+}

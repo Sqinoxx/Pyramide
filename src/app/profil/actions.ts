@@ -2,8 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { profileSchema, selfItnSchema } from "@/lib/validation";
-import { confirmItnMatch, getMemberByUserId, setSelfItn, updateMemberProfile } from "@/server/members";
+import { profileSchema, selfItnSchema, setLeaveSchema } from "@/lib/validation";
+import {
+  clearOnLeave,
+  confirmItnMatch,
+  getMemberByUserId,
+  setOnLeave,
+  setSelfItn,
+  updateMemberProfile,
+} from "@/server/members";
 import { dismissItnCandidate, findItnCandidatesForMember } from "@/server/itn-matching";
 import { fieldErrorsFromZod, type ActionState } from "@/lib/form-state";
 
@@ -78,5 +85,22 @@ export async function dismissOwnItnMatchAction(formData: FormData): Promise<void
   const { member, userId } = await requireMember();
   const itnRecordId = String(formData.get("itnRecordId") ?? "");
   await dismissItnCandidate(member.id, itnRecordId, userId);
+  revalidatePath("/profil");
+}
+
+export async function setLeaveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const { member } = await requireMember();
+  const parsed = setLeaveSchema.safeParse({ until: formData.get("until") });
+  if (!parsed.success) {
+    return { fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+  await setOnLeave(member.id, new Date(parsed.data.until));
+  revalidatePath("/profil");
+  return { success: true };
+}
+
+export async function clearLeaveAction(): Promise<void> {
+  const { member } = await requireMember();
+  await clearOnLeave(member.id);
   revalidatePath("/profil");
 }

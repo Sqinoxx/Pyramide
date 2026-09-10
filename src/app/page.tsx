@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
 import { getMemberByUserId } from "@/server/members";
 import { getEligibleDefenders } from "@/server/challenges";
+import { listPublishedAnnouncements } from "@/server/announcements";
 import { PyramidView } from "@/components/PyramidView";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
@@ -20,6 +21,7 @@ export default async function Home({
 
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
+  const announcements = division ? await listPublishedAnnouncements(division.id, 3) : [];
 
   const session = await auth();
   let viewerMemberId: string | undefined;
@@ -60,6 +62,20 @@ export default async function Home({
           </Link>
         ))}
       </div>
+
+      {announcements.length > 0 && (
+        <div className="mb-8 flex flex-col gap-2">
+          {announcements.map((a) => (
+            <div
+              key={a.id}
+              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm dark:border-amber-900 dark:bg-amber-950"
+            >
+              <p className="font-medium text-amber-900 dark:text-amber-200">{a.title}</p>
+              <p className="whitespace-pre-line text-amber-800 dark:text-amber-300">{a.bodyMd}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {view ? (
         <PyramidView

@@ -2,19 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { startSeason, SeasonAlreadyActiveError } from "@/server/seasons";
+import { startSeason, SeasonAlreadyActiveError, adminSwapPositions } from "@/server/seasons";
+import { recordAudit } from "@/server/audit";
 import type { ActionState } from "@/lib/form-state";
 
 async function requireAdmin() {
   const session = await auth();
   if (session?.user.role !== "admin") throw new Error("Forbidden");
+  return session.user.id;
 }
 
 export async function startSeasonAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const adminId = await requireAdmin();
 
   const divisionId = String(formData.get("divisionId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -23,7 +25,8 @@ export async function startSeasonAction(
   }
 
   try {
-    await startSeason(divisionId, name);
+    const season = await startSeason(divisionId, name);
+    await recordAudit(adminId, "start_season", "season", season.id, null, { divisionId, name });
   } catch (err) {
     if (err instanceof SeasonAlreadyActiveError) {
       return { error: err.message };
@@ -35,4 +38,20 @@ export async function startSeasonAction(
   revalidatePath("/admin/saison");
   revalidatePath("/");
   return { success: true };
+}
+
+export async function adminSwapPositionsAction(formData: FormData): Promise<void> {
+  const adminId = await requireAdmin();
+  const seasonId = String(formData.get("seasonId") ?? "");
+  const memberAId = String(formData.get("memberAId") ?? "");
+  const memberBId = String(formData.get("memberBId") ?? "");
+  if (!seasonId || !memberAId || !memberBId || memberAId === memberBId) return;
+
+  await adminSwapPositions(seasonId, memberAId, memberBId);
+  await recordAudit(adminId, "admin_move_position", "season", seasonId, null, {
+    memberAId,
+    memberBId,
+  });
+  revalidatePath("/admin/saison");
+  revalidatePath("/");
 }

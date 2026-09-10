@@ -71,6 +71,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "position_change",
   "announcement",
   "itn_mismatch",
+  "direct_message",
 ]);
 
 /* -------------------------------------------------------------------------- */
@@ -581,5 +582,23 @@ export const itnRecordsRelations = relations(itnRecords, ({ one }) => ({
   import: one(itnImports, {
     fields: [itnRecords.importId],
     references: [itnImports.id],
+  }),
+}));
+
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
+  actor: one(users, {
+    fields: [auditLog.actorId],
+    references: [users.id],
+  }),
+}));
+
+export const announcementsRelations = relations(announcements, ({ one }) => ({
+  division: one(divisions, {
+    fields: [announcements.divisionId],
+    references: [divisions.id],
+  }),
+  author: one(users, {
+    fields: [announcements.authorId],
+    references: [users.id],
   }),
 }));

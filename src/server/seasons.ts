@@ -5,6 +5,7 @@ import { seasons, positions, positionHistory, members, divisions } from "@/db/sc
 import { seedPyramid, type SeedEntry } from "@/lib/pyramid";
 import { getActiveItnForMember } from "./members";
 import { DEFAULT_DIVISION_SETTINGS } from "@/lib/settings";
+import { swapMemberPositions } from "./position-swap";
 
 export async function getAllDivisions() {
   return db.query.divisions.findMany({ orderBy: (d, { asc }) => [asc(d.name)] });
@@ -88,6 +89,34 @@ export async function startSeason(divisionId: string, name: string) {
 
     return season;
   });
+}
+
+export class MemberNotInSeasonError extends Error {
+  constructor() {
+    super("Beide Mitglieder müssen in dieser Saison eine Position haben.");
+    this.name = "MemberNotInSeasonError";
+  }
+}
+
+/**
+ * Direct admin correction (PLAN.md §12 phase 6): swaps two members'
+ * positions outright, for cases the challenge/inactivity flows don't cover
+ * (data-entry mistakes, manual adjustments after an off-platform dispute).
+ * Recorded with reason "admin" so it's distinguishable from a real
+ * challenge result in position_history.
+ */
+export async function adminSwapPositions(seasonId: string, memberAId: string, memberBId: string) {
+  if (memberAId === memberBId) throw new Error("Cannot swap a member with themselves");
+  const result = await db.transaction((tx) =>
+    swapMemberPositions(
+      tx,
+      seasonId,
+      { memberId: memberAId, reason: "admin" },
+      { memberId: memberBId, reason: "admin" },
+    ),
+  );
+  if (!result) throw new MemberNotInSeasonError();
+  return result;
 }
 
 export type PyramidRow = {

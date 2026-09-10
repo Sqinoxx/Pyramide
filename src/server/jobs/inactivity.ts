@@ -5,6 +5,7 @@ import { challenges, members, notifications, positionHistory, positions, seasons
 import { getActiveSeason } from "@/server/seasons";
 import { divisionSettingsSchema } from "@/lib/settings";
 import { notifyInactivityWarning, notifyPositionChange } from "@/server/notifications";
+import { swapMemberPositions } from "@/server/position-swap";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 /** Grace period after the warning before an actual demotion (PLAN.md §8.5: "Warnung, danach Abstieg" — the plan doesn't pin down how much later, so one extra week). */
@@ -51,8 +52,7 @@ async function demoteForInactivity(seasonId: string, memberId: string) {
     const [memberRow] = await tx
       .select()
       .from(positions)
-      .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, memberId)))
-      .for("update");
+      .where(and(eq(positions.seasonId, seasonId), eq(positions.memberId, memberId)));
     if (!memberRow) return;
 
     const [belowRow] = await tx
@@ -64,40 +64,16 @@ async function demoteForInactivity(seasonId: string, memberId: string) {
           eq(positions.row, memberRow.row + 1),
           eq(positions.slot, memberRow.slot),
         ),
-      )
-      .for("update");
+      );
     if (!belowRow) return;
 
-    await tx.update(positions).set({ row: -1, slot: -1 }).where(eq(positions.id, memberRow.id));
-    await tx
-      .update(positions)
-      .set({ row: memberRow.row, slot: memberRow.slot, since: new Date() })
-      .where(eq(positions.id, belowRow.id));
-    await tx
-      .update(positions)
-      .set({ row: belowRow.row, slot: belowRow.slot, since: new Date() })
-      .where(eq(positions.id, memberRow.id));
-
-    await tx.insert(positionHistory).values([
-      {
-        seasonId,
-        memberId,
-        fromRow: memberRow.row,
-        fromSlot: memberRow.slot,
-        toRow: belowRow.row,
-        toSlot: belowRow.slot,
-        reason: "inactivity",
-      },
-      {
-        seasonId,
-        memberId: belowRow.memberId,
-        fromRow: belowRow.row,
-        fromSlot: belowRow.slot,
-        toRow: memberRow.row,
-        toSlot: memberRow.slot,
-        reason: "inactivity",
-      },
-    ]);
+    const result = await swapMemberPositions(
+      tx,
+      seasonId,
+      { memberId, reason: "inactivity" },
+      { memberId: belowRow.memberId, reason: "inactivity" },
+    );
+    if (!result) return;
 
     await notifyPositionChange(memberId, "down", "Inaktivität");
     await notifyPositionChange(belowRow.memberId, "up", "Gegner inaktiv");

@@ -6,6 +6,7 @@ import { confirmItnMatch, setAdminItn } from "@/server/members";
 import { dismissItnCandidate } from "@/server/itn-matching";
 import { selfItnSchema } from "@/lib/validation";
 import { fieldErrorsFromZod, type ActionState } from "@/lib/form-state";
+import { recordAudit } from "@/server/audit";
 
 async function requireAdmin() {
   const session = await auth();
@@ -19,6 +20,7 @@ export async function confirmMatchAction(formData: FormData): Promise<void> {
   const itnRecordId = String(formData.get("itnRecordId") ?? "");
   if (!memberId || !itnRecordId) throw new Error("Missing fields");
   await confirmItnMatch(memberId, itnRecordId, userId);
+  await recordAudit(userId, "confirm_itn_match", "member", memberId, null, { itnRecordId });
   revalidatePath("/admin/itn");
 }
 
@@ -28,6 +30,7 @@ export async function dismissMatchAction(formData: FormData): Promise<void> {
   const itnRecordId = String(formData.get("itnRecordId") ?? "");
   if (!memberId || !itnRecordId) throw new Error("Missing fields");
   await dismissItnCandidate(memberId, itnRecordId, userId);
+  await recordAudit(userId, "dismiss_itn_match", "member", memberId, null, { itnRecordId });
   revalidatePath("/admin/itn");
 }
 
@@ -42,6 +45,7 @@ export async function setAdminItnAction(
     return { fieldErrors: fieldErrorsFromZod(parsed.error) };
   }
   await setAdminItn(memberId, parsed.data.value, userId);
+  await recordAudit(userId, "set_admin_itn", "member", memberId, null, { value: parsed.data.value });
   revalidatePath("/admin/itn");
   return { success: true };
 }

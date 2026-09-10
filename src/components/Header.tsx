@@ -18,8 +18,14 @@ export async function Header() {
         Tennis-Pyramide
       </Link>
       <nav className="flex items-center gap-4 text-sm">
+        <Link href="/ergebnisse" className="text-zinc-700 hover:underline dark:text-zinc-300">
+          Ergebnisse
+        </Link>
         {session?.user ? (
           <>
+            <Link href="/mitglieder" className="text-zinc-700 hover:underline dark:text-zinc-300">
+              Mitglieder
+            </Link>
             <Link href="/forderungen" className="text-zinc-700 hover:underline dark:text-zinc-300">
               Forderungen
             </Link>
@@ -43,7 +49,7 @@ export async function Header() {
                   href="/admin/mitglieder"
                   className="text-zinc-700 hover:underline dark:text-zinc-300"
                 >
-                  Mitglieder
+                  Registrierungen
                 </Link>
                 <Link
                   href="/admin/itn-import"
@@ -68,6 +74,18 @@ export async function Header() {
                   className="text-zinc-700 hover:underline dark:text-zinc-300"
                 >
                   Streitfälle
+                </Link>
+                <Link
+                  href="/admin/audit"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Audit-Log
+                </Link>
+                <Link
+                  href="/admin/ankuendigungen"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Ankündigungen
                 </Link>
               </>
             )}

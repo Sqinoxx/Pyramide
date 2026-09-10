@@ -72,3 +72,18 @@ export const profileSchema = z.object({
   preferredTimes: z.string().trim().max(500).optional().or(z.literal("")),
   showItnPublicly: z.boolean(),
 });
+
+/** Urlaubs-/Verletzungsmodus (PLAN.md §4.5): a member can't be challenged, and can't challenge, until this date. */
+export const MAX_LEAVE_DAYS = 90;
+
+export const setLeaveSchema = z.object({
+  until: z
+    .string()
+    .min(1, "Bitte ein Datum wählen")
+    .refine((v) => !Number.isNaN(Date.parse(v)), "Ungültiges Datum")
+    .refine((v) => new Date(v).getTime() > Date.now(), "Datum muss in der Zukunft liegen")
+    .refine(
+      (v) => new Date(v).getTime() <= Date.now() + MAX_LEAVE_DAYS * 24 * 60 * 60 * 1000,
+      `Maximal ${MAX_LEAVE_DAYS} Tage im Voraus`,
+    ),
+});

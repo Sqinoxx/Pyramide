@@ -1,10 +1,15 @@
-import { getAllDivisions, getActiveSeason } from "@/server/seasons";
+import { getAllDivisions, getActiveSeason, getPyramidView } from "@/server/seasons";
 import { StartSeasonForm } from "./StartSeasonForm";
+import { PositionSwapForm } from "./PositionSwapForm";
 
 export default async function SeasonAdminPage() {
   const divisions = await getAllDivisions();
   const withSeason = await Promise.all(
-    divisions.map(async (d) => ({ division: d, season: await getActiveSeason(d.id) })),
+    divisions.map(async (d) => ({
+      division: d,
+      season: await getActiveSeason(d.id),
+      view: await getPyramidView(d.id),
+    })),
   );
 
   return (
@@ -19,14 +24,19 @@ export default async function SeasonAdminPage() {
       </p>
 
       <ul className="flex flex-col gap-4">
-        {withSeason.map(({ division, season }) => (
+        {withSeason.map(({ division, season, view }) => (
           <li key={division.id} className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 font-medium text-zinc-900 dark:text-zinc-50">{division.name}</p>
             {season ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Aktive Saison: <strong>{season.name}</strong> (seit{" "}
-                {new Date(season.startsAt).toLocaleDateString("de-AT")})
-              </p>
+              <>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Aktive Saison: <strong>{season.name}</strong> (seit{" "}
+                  {new Date(season.startsAt).toLocaleDateString("de-AT")})
+                </p>
+                {view && view.rows.length >= 2 && (
+                  <PositionSwapForm seasonId={season.id} members={view.rows} />
+                )}
+              </>
             ) : (
               <StartSeasonForm divisionId={division.id} divisionName={division.name} />
             )}

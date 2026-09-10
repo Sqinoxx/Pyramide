@@ -326,3 +326,41 @@ export async function setAdminItn(memberId: string, value: number, setByUserId: 
     });
   });
 }
+
+/**
+ * Urlaubs-/Verletzungsmodus (PLAN.md §4.5): while `onLeaveUntil` is in the
+ * future, getEligibleDefenders() (src/server/challenges.ts) excludes the
+ * member both as a possible defender and — since it's checked from the
+ * other side too — effectively as a challenger, and the inactivity job
+ * (src/server/jobs/inactivity.ts) skips them so the clock doesn't run
+ * while they're deliberately away.
+ */
+export async function setOnLeave(memberId: string, until: Date) {
+  await db.update(members).set({ onLeaveUntil: until }).where(eq(members.id, memberId));
+}
+
+export async function clearOnLeave(memberId: string) {
+  await db.update(members).set({ onLeaveUntil: null }).where(eq(members.id, memberId));
+}
+
+/**
+ * Member directory (PLAN.md v1 "Suche/Filter Mitgliederliste") — only
+ * active members, and deliberately not phone/email (contact happens via
+ * notifications, see sendContactMessage in this file, "ohne Preisgabe von
+ * Telefonnummern").
+ */
+export async function listActiveMembers(query?: string) {
+  const q = query?.trim().toLowerCase();
+  const rows = await db.query.members.findMany({
+    where: eq(members.status, "active"),
+    orderBy: (m, { asc }) => [asc(m.lastName), asc(m.firstName)],
+    with: { division: true },
+  });
+  if (!q) return rows;
+  return rows.filter(
+    (m) =>
+      m.firstName.toLowerCase().includes(q) ||
+      m.lastName.toLowerCase().includes(q) ||
+      m.club?.toLowerCase().includes(q),
+  );
+}

@@ -1,9 +1,12 @@
 import { auth } from "@/auth";
 import { getActiveItnForMember, getMemberByUserId } from "@/server/members";
 import { findItnCandidatesForMember } from "@/server/itn-matching";
+import { getActiveSeason } from "@/server/seasons";
+import { getMemberStats } from "@/server/stats";
 import { formatItnBadge } from "@/lib/itn-precedence";
 import { ProfileForm } from "./ProfileForm";
 import { SelfItnForm } from "./SelfItnForm";
+import { LeaveForm } from "./LeaveForm";
 import { confirmOwnItnMatchAction, dismissOwnItnMatchAction } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,6 +35,9 @@ export default async function ProfilePage() {
   const match = hasConfirmedImport
     ? { tier: "none" as const, candidates: [] }
     : await findItnCandidatesForMember(member);
+
+  const season = member.divisionId ? await getActiveSeason(member.divisionId) : null;
+  const stats = season ? await getMemberStats(season.id, member.id) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-6 py-16">
@@ -90,6 +96,25 @@ export default async function ProfilePage() {
         </section>
       )}
 
+      {stats && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Statistik
+          </h2>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            Bilanz: <strong>{stats.wins}</strong> Siege – <strong>{stats.losses}</strong> Niederlagen
+            {stats.currentStreak && (
+              <>
+                {" · "}
+                {stats.currentStreak.count}{" "}
+                {stats.currentStreak.type === "win" ? "Siege" : "Niederlagen"} in Serie
+              </>
+            )}
+            {stats.bestRow && <> · Bestplatzierung: Reihe {stats.bestRow}</>}
+          </p>
+        </section>
+      )}
+
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           ITN
@@ -105,7 +130,7 @@ export default async function ProfilePage() {
         <SelfItnForm currentValue={activeItn?.source === "self" ? activeItn.value : null} />
       </section>
 
-      <section>
+      <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Profil
         </h2>
@@ -115,6 +140,13 @@ export default async function ProfilePage() {
           preferredTimes={member.preferredTimes}
           showItnPublicly={member.showItnPublicly}
         />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Urlaubs-/Verletzungsmodus
+        </h2>
+        <LeaveForm onLeaveUntil={member.onLeaveUntil?.toISOString() ?? null} />
       </section>
     </div>
   );

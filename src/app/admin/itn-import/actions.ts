@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { createItnImport } from "@/server/itn-import";
+import { recordAudit } from "@/server/audit";
 import type { ActionState } from "@/lib/form-state";
 
 async function requireAdmin() {
@@ -47,6 +48,11 @@ export async function importItnAction(
       parseErrors: result.errors.map((e) => `Zeile ${e.rowNumber || "?"}: ${e.message}`),
     };
   }
+
+  await recordAudit(userId, "import_itn", "itn_import", result.importId, null, {
+    fileName,
+    rowCount: result.rowCount,
+  });
 
   revalidatePath("/admin/itn-import");
   revalidatePath("/admin/itn");

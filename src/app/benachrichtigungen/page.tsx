@@ -50,6 +50,11 @@ function formatNotification(type: string, payload: Payload): { text: string; hre
         text: `Du warst ${payload.weeksInactive} Wochen ohne Match.`,
         href: "/",
       };
+    case "direct_message":
+      return {
+        text: `${payload.fromName}: ${payload.message}`,
+        href: "/mitglieder",
+      };
     default:
       return { text: type, href: "/" };
   }

@@ -12,7 +12,8 @@ export default auth((req) => {
   const isMemberRoute =
     pathname.startsWith("/profil") ||
     pathname.startsWith("/forderungen") ||
-    pathname.startsWith("/benachrichtigungen");
+    pathname.startsWith("/benachrichtigungen") ||
+    pathname.startsWith("/mitglieder");
 
   if ((isAdminRoute || isMemberRoute) && !session) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
@@ -32,6 +33,7 @@ export const config = {
     "/profil/:path*",
     "/forderungen/:path*",
     "/benachrichtigungen/:path*",
+    "/mitglieder/:path*",
     "/admin/:path*",
   ],
 };
