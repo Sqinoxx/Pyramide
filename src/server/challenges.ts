@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -22,6 +22,15 @@ import {
 } from "@/lib/challenge-fsm";
 import { divisionSettingsSchema, type DivisionSettings } from "@/lib/settings";
 import { determineWinnerFromSets, type SetScore } from "@/lib/match-result";
+import {
+  notifyChallengeAccepted,
+  notifyChallengeDeclined,
+  notifyChallengeReceived,
+  notifyPositionChange,
+  notifyResultConfirmed,
+  notifyResultReported,
+  notifyWalkover,
+} from "./notifications";
 import * as schema from "@/db/schema";
 
 type Tx = PgTransaction<
@@ -208,6 +217,11 @@ export async function createChallenge(seasonId: string, challengerId: string, de
       })
       .returning();
 
+    const challenger = await db.query.members.findFirst({ where: eq(members.id, challengerId) });
+    if (challenger) {
+      await notifyChallengeReceived(defenderId, `${challenger.firstName} ${challenger.lastName}`);
+    }
+
     return challenge;
   } catch (err) {
     // Backstop for the race between the hasOpenChallenge() checks above and
@@ -228,7 +242,10 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 async function requireChallenge(challengeId: string) {
-  const challenge = await db.query.challenges.findFirst({ where: eq(challenges.id, challengeId) });
+  const challenge = await db.query.challenges.findFirst({
+    where: eq(challenges.id, challengeId),
+    with: { challenger: true, defender: true },
+  });
   if (!challenge) throw new ChallengeError("Forderung nicht gefunden.");
   return challenge;
 }
@@ -256,6 +273,11 @@ export async function acceptChallenge(challengeId: string, memberId: string) {
       playDeadline: addDays(now, settings.playDeadlineDays),
     })
     .where(eq(challenges.id, challengeId));
+
+  await notifyChallengeAccepted(
+    challenge.challengerId,
+    `${challenge.defender.firstName} ${challenge.defender.lastName}`,
+  );
 }
 
 export async function declineChallenge(challengeId: string, memberId: string, reason: string) {
@@ -282,6 +304,26 @@ export async function declineChallenge(challengeId: string, memberId: string, re
       await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, result.winner);
     }
   });
+
+  await notifyChallengeDeclined(
+    challenge.challengerId,
+    `${challenge.defender.firstName} ${challenge.defender.lastName}`,
+    reason || null,
+  );
+  if (result.winner === "challenger") {
+    await notifyWalkover(
+      challenge.challengerId,
+      true,
+      `${challenge.defender.firstName} ${challenge.defender.lastName}`,
+    );
+    await notifyWalkover(
+      challenge.defenderId,
+      false,
+      `${challenge.challenger.firstName} ${challenge.challenger.lastName}`,
+    );
+    await notifyPositionChange(challenge.challengerId, "up", "Forderung gewonnen (Walkover)");
+    await notifyPositionChange(challenge.defenderId, "down", "Forderung verloren (Walkover)");
+  }
 }
 
 export async function reportResult(
@@ -321,6 +363,10 @@ export async function reportResult(
 
     await tx.update(challenges).set({ state: result.state }).where(eq(challenges.id, challengeId));
   });
+
+  const recipientId = reportedByMemberId === challenge.challengerId ? challenge.defenderId : challenge.challengerId;
+  const reporter = reportedByMemberId === challenge.challengerId ? challenge.challenger : challenge.defender;
+  await notifyResultReported(recipientId, `${reporter.firstName} ${reporter.lastName}`);
 }
 
 export async function confirmResult(challengeId: string, confirmingMemberId: string) {
@@ -334,6 +380,7 @@ export async function confirmResult(challengeId: string, confirmingMemberId: str
   }
 
   const result = safeTransition(challenge.state as ChallengeState, { type: "confirm" });
+  const winnerRole = match.winnerId === challenge.challengerId ? "challenger" : "defender";
 
   await db.transaction(async (tx) => {
     await tx
@@ -346,9 +393,14 @@ export async function confirmResult(challengeId: string, confirmingMemberId: str
       .set({ state: result.state, resolution: "played", resolvedAt: new Date() })
       .where(eq(challenges.id, challengeId));
 
-    const winnerRole = match.winnerId === challenge.challengerId ? "challenger" : "defender";
     await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, winnerRole);
   });
+
+  await notifyResultConfirmed(match.reportedBy!, false);
+  if (winnerRole === "challenger") {
+    await notifyPositionChange(challenge.challengerId, "up", "Forderung gewonnen");
+    await notifyPositionChange(challenge.defenderId, "down", "Forderung verloren");
+  }
 }
 
 export async function disputeResult(challengeId: string, memberId: string) {
@@ -384,6 +436,32 @@ export async function adminResolveChallenge(challengeId: string, winnerId: strin
 
     await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, winnerRole);
   });
+
+  // "disputed" -> admin_resolve means a match *was* played but was contested
+  // (resolution "played"); "expired_play" -> admin_resolve means nobody
+  // showed up by the deadline (a genuine walkover) — only the latter should
+  // say "Nichtantreten" to the players.
+  const loserId = winnerRole === "challenger" ? challenge.defenderId : challenge.challengerId;
+  const winnerName =
+    winnerRole === "challenger"
+      ? `${challenge.challenger.firstName} ${challenge.challenger.lastName}`
+      : `${challenge.defender.firstName} ${challenge.defender.lastName}`;
+  const loserName =
+    winnerRole === "challenger"
+      ? `${challenge.defender.firstName} ${challenge.defender.lastName}`
+      : `${challenge.challenger.firstName} ${challenge.challenger.lastName}`;
+
+  if (result.resolution === "played") {
+    await notifyResultConfirmed(winnerId, false);
+  } else {
+    await notifyWalkover(winnerId, true, loserName);
+    await notifyWalkover(loserId, false, winnerName);
+  }
+
+  if (winnerRole === "challenger") {
+    await notifyPositionChange(challenge.challengerId, "up", "Admin-Entscheidung");
+    await notifyPositionChange(challenge.defenderId, "down", "Admin-Entscheidung");
+  }
 }
 
 /**
@@ -463,6 +541,115 @@ async function settlePosition(
   ]);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Deadline jobs (PLAN.md §8) — called by src/worker, one challenge at a     */
+/*  time so a single failure doesn't block the rest of the batch.            */
+/* -------------------------------------------------------------------------- */
+
+export async function findExpiredAcceptChallenges(): Promise<string[]> {
+  const rows = await db.query.challenges.findMany({
+    where: and(eq(challenges.state, "proposed"), lt(challenges.acceptDeadline, new Date())),
+  });
+  return rows.map((r) => r.id);
+}
+
+export async function findExpiredPlayChallenges(): Promise<string[]> {
+  const rows = await db.query.challenges.findMany({
+    where: and(eq(challenges.state, "accepted"), lt(challenges.playDeadline, new Date())),
+  });
+  return rows.map((r) => r.id);
+}
+
+export async function findUnconfirmedReports(): Promise<string[]> {
+  const rows = await db
+    .select({ challenge: challenges, match: matches })
+    .from(challenges)
+    .innerJoin(matches, eq(matches.challengeId, challenges.id))
+    .where(eq(challenges.state, "reported"));
+
+  const overdue: string[] = [];
+  for (const { challenge, match } of rows) {
+    const settings = await getSeasonSettings(challenge.seasonId);
+    if (addDays(match.createdAt, settings.reportConfirmDays) < new Date()) {
+      overdue.push(challenge.id);
+    }
+  }
+  return overdue;
+}
+
+/** Nobody accepted in time — the challenger wins by default (PLAN.md §8.1). */
+export async function expireAcceptDeadline(challengeId: string) {
+  const challenge = await requireChallenge(challengeId);
+  if (challenge.state !== "proposed") return; // already handled by a concurrent run
+
+  const result = safeTransition(challenge.state as ChallengeState, { type: "accept_deadline_passed" });
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(challenges)
+      .set({ state: result.state, resolution: result.resolution, resolvedAt: new Date() })
+      .where(eq(challenges.id, challengeId));
+    if (result.winner) {
+      await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, result.winner);
+    }
+  });
+
+  await notifyWalkover(
+    challenge.challengerId,
+    true,
+    `${challenge.defender.firstName} ${challenge.defender.lastName}`,
+  );
+  await notifyWalkover(
+    challenge.defenderId,
+    false,
+    `${challenge.challenger.firstName} ${challenge.challenger.lastName}`,
+  );
+  await notifyPositionChange(challenge.challengerId, "up", "Forderung nicht rechtzeitig angenommen");
+  await notifyPositionChange(challenge.defenderId, "down", "Forderung nicht rechtzeitig angenommen");
+}
+
+/**
+ * Nobody reported a result in time. Unlike a missed accept-deadline, fault
+ * here isn't clear from the data alone (could be either side dodging, or
+ * neither), so this only flags the challenge for admin triage
+ * (/admin/forderungen) rather than declaring a winner automatically.
+ */
+export async function expirePlayDeadline(challengeId: string) {
+  const challenge = await requireChallenge(challengeId);
+  if (challenge.state !== "accepted") return;
+
+  const result = safeTransition(challenge.state as ChallengeState, { type: "play_deadline_passed" });
+  await db.update(challenges).set({ state: result.state }).where(eq(challenges.id, challengeId));
+}
+
+/** Confirmation window elapsed without a dispute — the reported result stands. */
+export async function autoConfirmResult(challengeId: string) {
+  const challenge = await requireChallenge(challengeId);
+  if (challenge.state !== "reported") return;
+
+  const match = await db.query.matches.findFirst({ where: eq(matches.challengeId, challengeId) });
+  if (!match) return;
+
+  const result = safeTransition(challenge.state as ChallengeState, {
+    type: "report_confirm_deadline_passed",
+  });
+  const winnerRole = match.winnerId === challenge.challengerId ? "challenger" : "defender";
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(challenges)
+      .set({ state: result.state, resolution: "played", resolvedAt: new Date() })
+      .where(eq(challenges.id, challengeId));
+    await settlePosition(tx, challenge.seasonId, challengeId, challenge.challengerId, challenge.defenderId, winnerRole);
+  });
+
+  await notifyResultConfirmed(match.reportedBy!, true);
+  if (winnerRole === "challenger") {
+    await notifyPositionChange(challenge.challengerId, "up", "Ergebnis automatisch bestätigt");
+    await notifyPositionChange(challenge.defenderId, "down", "Ergebnis automatisch bestätigt");
+  }
+}
+
 export async function listChallengesForMember(seasonId: string, memberId: string) {
   return db.query.challenges.findMany({
     where: and(
@@ -475,9 +662,10 @@ export async function listChallengesForMember(seasonId: string, memberId: string
 }
 
 /** For the admin arbitration queue (/admin/forderungen). */
-export async function listDisputedChallenges() {
+/** Disputed results and matches nobody reported by the play deadline — both need an admin to pick a winner (or cancel). */
+export async function listChallengesNeedingAdminAttention() {
   return db.query.challenges.findMany({
-    where: eq(challenges.state, "disputed"),
+    where: inArray(challenges.state, ["disputed", "expired_play"]),
     orderBy: (c, { asc }) => [asc(c.proposedAt)],
     with: {
       challenger: true,

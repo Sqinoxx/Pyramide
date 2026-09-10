@@ -90,6 +90,28 @@ export async function sendAdminApprovalNeededEmail(to: string, memberName: strin
   );
 }
 
+/**
+ * Generic wrapper used by src/server/notifications.ts for the challenge/
+ * match/deadline notifications from PLAN.md §8 — those have too many
+ * variants to warrant a dedicated template function each like the auth
+ * mails above.
+ */
+export async function sendNotificationEmail(
+  to: string,
+  subject: string,
+  bodyText: string,
+  bodyHtml: string,
+  linkPath?: string,
+) {
+  const link = linkPath ? appUrl(linkPath) : null;
+  await send(
+    to,
+    subject,
+    bodyText + (link ? `\n\n${link}` : ""),
+    layout(subject, bodyHtml + (link ? `<p><a href="${link}">Ansehen</a></p>` : "")),
+  );
+}
+
 export async function sendMemberApprovedEmail(to: string, firstName: string, divisionName: string) {
   const link = appUrl("/profil");
   await send(

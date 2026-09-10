@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { getMemberByUserId } from "@/server/members";
+import { countUnreadNotifications } from "@/server/notifications";
 
 export async function Header() {
   const session = await auth();
+
+  let unreadCount = 0;
+  if (session?.user) {
+    const member = await getMemberByUserId(session.user.id);
+    if (member) unreadCount = await countUnreadNotifications(member.id);
+  }
 
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
@@ -14,6 +22,17 @@ export async function Header() {
           <>
             <Link href="/forderungen" className="text-zinc-700 hover:underline dark:text-zinc-300">
               Forderungen
+            </Link>
+            <Link
+              href="/benachrichtigungen"
+              className="text-zinc-700 hover:underline dark:text-zinc-300"
+            >
+              Benachrichtigungen
+              {unreadCount > 0 && (
+                <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-medium text-white">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
             <Link href="/profil" className="text-zinc-700 hover:underline dark:text-zinc-300">
               Profil

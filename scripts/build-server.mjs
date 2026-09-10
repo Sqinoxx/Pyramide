@@ -20,6 +20,12 @@ for (const { entry, out } of targets) {
     sourcemap: true,
     // postgres.js and drizzle-orm are pure JS — safe to bundle.
     external: [],
+    // Without this, the "server-only" import guard used throughout
+    // src/server/*.ts resolves to its throwing index.js (its package.json
+    // only maps the safe empty.js under the "react-server" condition,
+    // which Next.js's own bundler sets automatically but esbuild doesn't).
+    // The worker imports those modules directly, so it needs this too.
+    conditions: ["react-server"],
   });
   console.log(`[build-server] ${entry} -> ${out}`);
 }

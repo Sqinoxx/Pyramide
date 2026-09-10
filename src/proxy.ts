@@ -9,7 +9,10 @@ export default auth((req) => {
   const session = req.auth;
 
   const isAdminRoute = pathname.startsWith("/admin");
-  const isMemberRoute = pathname.startsWith("/profil") || pathname.startsWith("/forderungen");
+  const isMemberRoute =
+    pathname.startsWith("/profil") ||
+    pathname.startsWith("/forderungen") ||
+    pathname.startsWith("/benachrichtigungen");
 
   if ((isAdminRoute || isMemberRoute) && !session) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
@@ -25,5 +28,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/profil/:path*", "/forderungen/:path*", "/admin/:path*"],
+  matcher: [
+    "/profil/:path*",
+    "/forderungen/:path*",
+    "/benachrichtigungen/:path*",
+    "/admin/:path*",
+  ],
 };

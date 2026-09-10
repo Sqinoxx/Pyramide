@@ -1,8 +1,13 @@
-import { listDisputedChallenges } from "@/server/challenges";
+import { listChallengesNeedingAdminAttention } from "@/server/challenges";
 import { resolveDisputeAction } from "./actions";
 
+const STATE_LABEL: Record<string, string> = {
+  disputed: "Ergebnis strittig",
+  expired_play: "Austragungsfrist abgelaufen, kein Ergebnis gemeldet",
+};
+
 export default async function DisputedChallengesPage() {
-  const disputed = await listDisputedChallenges();
+  const items = await listChallengesNeedingAdminAttention();
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16">
@@ -15,27 +20,34 @@ export default async function DisputedChallengesPage() {
         Forderung ohne Positionsänderung storniert.
       </p>
 
-      {disputed.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Keine strittigen Forderungen.</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">Keine offenen Fälle.</p>
       ) : (
         <ul className="flex flex-col gap-4">
-          {disputed.map((c) => (
+          {items.map((c) => (
             <li key={c.id} className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
               <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-50">
                 {c.challenger.firstName} {c.challenger.lastName} vs. {c.defender.firstName}{" "}
                 {c.defender.lastName}
               </p>
               <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-                {c.season.division?.name} ·{" "}
-                {c.match?.sets
-                  .map((s) =>
-                    s.tiebreakA !== null && s.gamesA === 0 && s.gamesB === 0
-                      ? `${s.tiebreakA}:${s.tiebreakB}`
-                      : `${s.gamesA}:${s.gamesB}`,
-                  )
-                  .join(", ") ?? "kein Ergebnis gemeldet"}
-                {" · gemeldet von "}
-                {c.match?.reportedBy === c.challengerId ? c.challenger.firstName : c.defender.firstName}
+                {c.season.division?.name} · {STATE_LABEL[c.state] ?? c.state}
+                {c.match && (
+                  <>
+                    {" · "}
+                    {c.match.sets
+                      .map((s) =>
+                        s.tiebreakA !== null && s.gamesA === 0 && s.gamesB === 0
+                          ? `${s.tiebreakA}:${s.tiebreakB}`
+                          : `${s.gamesA}:${s.gamesB}`,
+                      )
+                      .join(", ")}
+                    {" · gemeldet von "}
+                    {c.match.reportedBy === c.challengerId
+                      ? c.challenger.firstName
+                      : c.defender.firstName}
+                  </>
+                )}
               </p>
               <div className="flex flex-wrap gap-2">
                 <form action={resolveDisputeAction}>
