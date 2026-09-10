@@ -12,13 +12,9 @@ import {
   seasons,
   users,
 } from "@/db/schema";
-import { normalizeName } from "@/lib/itn-match";
 import { resolveActiveItn, type ActiveItn } from "@/lib/itn-precedence";
 import { nextOpenPosition } from "@/lib/pyramid";
-import { hashPassword } from "@/lib/password";
-import { createVerificationToken } from "./tokens";
-import { sendAdminApprovalNeededEmail, sendMemberApprovedEmail, sendVerificationEmail } from "./mailer";
-import type { RegisterInput } from "@/lib/validation";
+import { sendMemberApprovedEmail } from "./mailer";
 
 export async function getDivisionForGender(gender: "m" | "w") {
   const key = gender === "m" ? "herren" : "damen";
@@ -27,74 +23,12 @@ export async function getDivisionForGender(gender: "m" | "w") {
   return division;
 }
 
-export class EmailInUseError extends Error {
-  constructor() {
-    super("E-Mail-Adresse wird bereits verwendet");
-    this.name = "EmailInUseError";
-  }
-}
-
 /**
- * Registration (PLAN.md §3): creates the user + member row (status
- * "pending"), assigns the division from gender, and sends the verification
- * email. Admin approval and pyramid placement happen later in
- * approveMember(), once the address is confirmed.
+ * Marks the account's email verified. For members this only ever happens as
+ * a side effect of consuming a magic-link token (src/auth.ts) — clicking
+ * the link they were emailed *is* the verification, there's no separate
+ * step. See src/server/join.ts for where the account itself gets created.
  */
-export async function registerMember(input: RegisterInput) {
-  const existing = await db.query.users.findFirst({ where: eq(users.email, input.email) });
-  if (existing) throw new EmailInUseError();
-
-  const division = await getDivisionForGender(input.gender);
-  const passwordHash = await hashPassword(input.password);
-
-  const { user, member } = await db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(users)
-      .values({ email: input.email, passwordHash, role: "member" })
-      .returning();
-
-    const [member] = await tx
-      .insert(members)
-      .values({
-        userId: user.id,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        birthYear: input.birthYear,
-        gender: input.gender,
-        club: input.club || null,
-        phone: input.phone || null,
-        divisionId: division.id,
-        status: "pending",
-        normalizedName: normalizeName(input.lastName, input.firstName),
-      })
-      .returning();
-
-    return { user, member };
-  });
-
-  const rawToken = await createVerificationToken(user.email, "verify-email");
-  // The account (and its verification token) already exist at this point —
-  // an SMTP hiccup here must not turn into "Registrierung fehlgeschlagen"
-  // and leave a real account the user can't get back to. They can request
-  // a new link via resendVerificationEmail() below.
-  await sendVerificationEmail(user.email, member.firstName, rawToken).catch((err) => {
-    console.error("[register] verification email failed to send", err);
-  });
-
-  const admins = await db.query.users.findMany({ where: eq(users.role, "admin") });
-  await Promise.all(
-    admins.map((admin) =>
-      sendAdminApprovalNeededEmail(admin.email, `${member.firstName} ${member.lastName}`).catch(
-        () => {
-          // Best-effort: a failed admin notification shouldn't fail registration.
-        },
-      ),
-    ),
-  );
-
-  return { userId: user.id, memberId: member.id };
-}
-
 export async function markEmailVerified(email: string) {
   await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.email, email));
 }
@@ -369,25 +303,4 @@ export async function listActiveMembers(query?: string) {
       m.lastName.toLowerCase().includes(q) ||
       m.club?.toLowerCase().includes(q),
   );
-}
-
-/**
- * Re-sends the verification link — the gap this closes: registerMember()
- * creates the account before attempting to send that first email, so an
- * SMTP outage (or the mail landing in spam) previously left a real,
- * permanently-unverifiable account with no recovery path. Always resolves
- * without revealing whether the address is registered or already verified,
- * for the same reason password-reset requests don't reveal that either.
- */
-export async function resendVerificationEmail(email: string) {
-  const user = await db.query.users.findFirst({
-    where: eq(users.email, email),
-    with: { member: true },
-  });
-  if (!user || user.emailVerifiedAt) return;
-
-  const rawToken = await createVerificationToken(user.email, "verify-email");
-  await sendVerificationEmail(user.email, user.member?.firstName ?? "", rawToken).catch((err) => {
-    console.error("[resend-verification] send failed", err);
-  });
 }

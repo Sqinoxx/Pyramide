@@ -1,5 +1,6 @@
 import type { PyramidRow } from "@/server/seasons";
 import { formatItnBadge } from "@/lib/itn-precedence";
+import { rankOf } from "@/lib/pyramid";
 import { createChallengeAction } from "@/app/forderungen/actions";
 
 function groupByRow(rows: PyramidRow[]): PyramidRow[][] {
@@ -49,6 +50,9 @@ export function PyramidView({
                       : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900")
                   }
                 >
+                  <span className="text-[11px] font-semibold tabular-nums text-zinc-400 dark:text-zinc-500">
+                    {rankOf({ row: entry.row, slot: entry.slot })}
+                  </span>
                   <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                     {entry.firstName} {entry.lastName}
                   </span>

@@ -45,20 +45,40 @@ function layout(title: string, bodyHtml: string): string {
   </body></html>`;
 }
 
-export async function sendVerificationEmail(to: string, firstName: string, rawToken: string) {
-  const link = appUrl(`/verifizieren?email=${encodeURIComponent(to)}&token=${rawToken}`);
+/**
+ * Passwordless login link (src/auth.ts's "magic-link" provider) — used both
+ * for a brand-new join (isNewJoin: true, PLAN.md follow-up: no separate
+ * password/verification step, clicking this link *is* the verification)
+ * and for a returning member's regular login.
+ */
+export async function sendMagicLoginEmail(
+  to: string,
+  firstName: string,
+  rawToken: string,
+  isNewJoin: boolean,
+) {
+  const link = appUrl(`/anmelden/bestaetigen?email=${encodeURIComponent(to)}&token=${rawToken}`);
+  const subject = isNewJoin ? "Anmeldung zur Pyramide bestätigen" : "Dein Login-Link";
+  const intro = isNewJoin
+    ? "bitte bestätige deine Anmeldung zur Tennis-Pyramide:"
+    : "hier ist dein Login-Link:";
   await send(
     to,
-    "Bitte E-Mail-Adresse bestätigen",
-    `Hallo ${firstName},\n\nbitte bestätige deine E-Mail-Adresse: ${link}\n\nDer Link ist 3 Tage gültig.`,
+    subject,
+    `Hallo ${firstName},\n\n${intro} ${link}\n\nDer Link ist 15 Minuten gültig.`,
     layout(
-      "E-Mail-Adresse bestätigen",
+      subject,
       `<p>Hallo ${esc(firstName)},</p>
-       <p>bitte bestätige deine E-Mail-Adresse, um deine Registrierung abzuschließen:</p>
-       <p><a href="${link}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">E-Mail bestätigen</a></p>
-       <p>Der Link ist 3 Tage gültig.</p>`,
+       <p>${intro}</p>
+       <p><a href="${link}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">${isNewJoin ? "Anmeldung bestätigen" : "Anmelden"}</a></p>
+       <p>Der Link ist 15 Minuten gültig. Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>`,
     ),
   );
+}
+
+/** Same idea as sendMagicLoginEmail, but a specific label since this one comes from the pyramid join flow. */
+export async function sendJoinConfirmationEmail(to: string, firstName: string, rawToken: string) {
+  await sendMagicLoginEmail(to, firstName, rawToken, true);
 }
 
 export async function sendPasswordResetEmail(to: string, firstName: string, rawToken: string) {
@@ -81,11 +101,11 @@ export async function sendAdminApprovalNeededEmail(to: string, memberName: strin
   const link = appUrl("/admin/mitglieder");
   await send(
     to,
-    "Neue Registrierung wartet auf Freigabe",
-    `${memberName} hat sich registriert und wartet auf Freigabe: ${link}`,
+    "Neue Anmeldung wartet auf Freigabe",
+    `${memberName} möchte der Pyramide beitreten und wartet auf Freigabe: ${link}`,
     layout(
-      "Neue Registrierung wartet auf Freigabe",
-      `<p><strong>${esc(memberName)}</strong> hat sich registriert und wartet auf Freigabe.</p>
+      "Neue Anmeldung wartet auf Freigabe",
+      `<p><strong>${esc(memberName)}</strong> möchte der Pyramide beitreten und wartet auf Freigabe.</p>
        <p><a href="${link}">Zur Mitgliederverwaltung</a></p>`,
     ),
   );

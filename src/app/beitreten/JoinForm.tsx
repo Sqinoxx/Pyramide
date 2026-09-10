@@ -1,16 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
-import { registerAction } from "./actions";
+import { joinAction } from "./actions";
 import { initialActionState } from "@/lib/form-state";
 import { Field, SelectField, FormError, FormSuccess, SubmitButton } from "@/components/form";
 
-export function RegisterForm() {
-  const [state, formAction, pending] = useActionState(registerAction, initialActionState);
+export function JoinForm() {
+  const [state, formAction, pending] = useActionState(joinAction, initialActionState);
 
   if (state.success) {
     return (
-      <FormSuccess message="Fast geschafft: Wir haben dir eine E-Mail geschickt. Bitte bestätige deine Adresse über den Link darin." />
+      <FormSuccess message="Fast geschafft: Wir haben dir eine E-Mail geschickt. Bitte bestätige deine Anmeldung über den Link darin — danach prüft ein Admin deine Anmeldung." />
     );
   }
 
@@ -31,24 +31,6 @@ export function RegisterForm() {
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
-          label="Passwort"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          error={state.fieldErrors?.password}
-        />
-        <Field
-          label="Passwort bestätigen"
-          name="passwordConfirm"
-          type="password"
-          autoComplete="new-password"
-          required
-          error={state.fieldErrors?.passwordConfirm}
-        />
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field
           label="Geburtsjahr"
           name="birthYear"
           type="number"
@@ -66,11 +48,18 @@ export function RegisterForm() {
           error={state.fieldErrors?.gender}
         />
       </div>
+      <Field
+        label="ITN (falls bekannt)"
+        name="itn"
+        type="number"
+        placeholder="z. B. 5.5 — leer lassen, falls noch keine vorhanden"
+        error={state.fieldErrors?.itn}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Verein" name="club" placeholder="z. B. UTC Pyramide" />
+        <Field label="Verein" name="club" placeholder="z. B. UTC Neukirchen" />
         <Field label="Telefon (optional)" name="phone" type="tel" />
       </div>
-      <SubmitButton>{pending ? "Wird gesendet…" : "Registrieren"}</SubmitButton>
+      <SubmitButton>{pending ? "Wird gesendet…" : "Zur Pyramide anmelden"}</SubmitButton>
     </form>
   );
 }

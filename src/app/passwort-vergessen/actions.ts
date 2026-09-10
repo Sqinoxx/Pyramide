@@ -34,9 +34,12 @@ export async function requestPasswordResetAction(
     with: { member: true },
   });
 
-  // Deliberately the same response whether or not the account exists, so
-  // this endpoint can't be used to enumerate registered email addresses.
-  if (user) {
+  // Deliberately the same response whether or not the account exists (or
+  // has a password at all — members are passwordless now, see
+  // src/server/join.ts, and shouldn't be able to bootstrap themselves a
+  // password this way), so this endpoint can't be used to enumerate
+  // registered email addresses or their login method.
+  if (user?.passwordHash) {
     const rawToken = await createVerificationToken(user.email, "reset-password");
     await sendPasswordResetEmail(user.email, user.member?.firstName ?? "", rawToken).catch(
       (err) => console.error("[password-reset] send failed", err),

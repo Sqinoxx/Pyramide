@@ -4,12 +4,12 @@ import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { verificationTokens } from "@/db/schema";
 
-export type TokenPurpose = "verify-email" | "reset-password";
+export type TokenPurpose = "reset-password" | "magic-login";
 
 const TOKEN_BYTES = 32;
 const EXPIRY_MS: Record<TokenPurpose, number> = {
-  "verify-email": 3 * 24 * 60 * 60 * 1000, // 3 days
   "reset-password": 60 * 60 * 1000, // 1 hour
+  "magic-login": 15 * 60 * 1000, // 15 minutes — reissued on every login attempt anyway
 };
 
 function hashToken(raw: string): string {

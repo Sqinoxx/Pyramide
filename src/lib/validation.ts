@@ -24,29 +24,46 @@ const nameSchema = (requiredMessage: string) =>
     .max(100)
     .refine((v) => !/[\r\n\t]/.test(v), "Ungültige Zeichen");
 
-export const registerSchema = z
-  .object({
-    firstName: nameSchema("Vorname erforderlich"),
-    lastName: nameSchema("Nachname erforderlich"),
-    email: emailSchema,
-    password: passwordSchema,
-    passwordConfirm: z.string(),
-    birthYear: z.coerce
-      .number()
-      .int()
-      .min(1920, "Ungültiges Geburtsjahr")
-      .max(new Date().getFullYear(), "Ungültiges Geburtsjahr"),
-    gender: z.enum(["m", "w"], { message: "Bitte auswählen" }),
-    club: z.string().trim().max(150).optional().or(z.literal("")),
-    phone: z.string().trim().max(40).optional().or(z.literal("")),
-  })
-  .refine((data) => data.password === data.passwordConfirm, {
-    message: "Passwörter stimmen nicht überein",
-    path: ["passwordConfirm"],
-  });
+export const ITN_MIN = 1.0;
+export const ITN_MAX = 10.3;
 
-export type RegisterInput = z.infer<typeof registerSchema>;
+/**
+ * Joining the pyramid (PLAN.md follow-up: UTC Neukirchen already runs its
+ * own membership system — this app doesn't duplicate it with a password.
+ * Identity is proven by clicking the magic-link email, see
+ * src/server/join.ts / src/auth.ts's "magic-link" provider) instead of
+ * setting a password here. ITN and gender are collected up front — unlike
+ * the old password-based registration, where ITN was only ever optional
+ * self-reported data added later in the profile.
+ */
+export const joinSchema = z.object({
+  firstName: nameSchema("Vorname erforderlich"),
+  lastName: nameSchema("Nachname erforderlich"),
+  email: emailSchema,
+  birthYear: z.coerce
+    .number()
+    .int()
+    .min(1920, "Ungültiges Geburtsjahr")
+    .max(new Date().getFullYear(), "Ungültiges Geburtsjahr"),
+  gender: z.enum(["m", "w"], { message: "Bitte auswählen" }),
+  itn: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : Number(v)))
+    .refine((v) => v === null || (!Number.isNaN(v) && v >= ITN_MIN && v <= ITN_MAX), {
+      message: `ITN muss zwischen ${ITN_MIN} und ${ITN_MAX} liegen (oder leer lassen, falls noch keine vorhanden)`,
+    }),
+  club: z.string().trim().max(150).optional().or(z.literal("")),
+  phone: z.string().trim().max(40).optional().or(z.literal("")),
+});
 
+export type JoinInput = z.infer<typeof joinSchema>;
+
+export const magicLoginRequestSchema = z.object({
+  email: emailSchema,
+});
+
+/** Password login — admin accounts only now, see src/auth.ts. */
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Passwort erforderlich"),
@@ -67,9 +84,6 @@ export const resetPasswordSchema = z
     message: "Passwörter stimmen nicht überein",
     path: ["passwordConfirm"],
   });
-
-export const ITN_MIN = 1.0;
-export const ITN_MAX = 10.3;
 
 export const selfItnSchema = z.object({
   value: z.coerce

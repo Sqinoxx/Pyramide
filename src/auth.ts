@@ -4,8 +4,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/password";
-import { loginSchema } from "@/lib/validation";
+import { loginSchema, emailSchema } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { consumeVerificationToken } from "@/server/tokens";
+import { markEmailVerified } from "@/server/members";
 
 declare module "next-auth" {
   interface User {
@@ -46,7 +48,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // there's no untrusted edge forging the Host header directly at the app.
   trustHost: true,
   providers: [
+    // Password login — only ever used by admin accounts now (members join
+    // and log in passwordlessly, see the "magic-link" provider below;
+    // users.passwordHash is nullable precisely because member accounts
+    // never get one).
     Credentials({
+      id: "credentials",
       credentials: { email: {}, password: {} },
       async authorize(raw) {
         const parsed = loginSchema.safeParse(raw);
@@ -57,7 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!limit.allowed) return null;
 
         const user = await db.query.users.findFirst({ where: eq(users.email, email) });
-        if (!user) return null;
+        if (!user || !user.passwordHash) return null;
 
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid) return null;
@@ -67,6 +74,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // so a generic rejection (rather than a distinguishable thrown
         // error) is fine here.
         if (!user.emailVerifiedAt) return null;
+
+        return { id: user.id, email: user.email, role: user.role };
+      },
+    }),
+    // Magic-link login for members: proof of owning the inbox (clicking the
+    // link, which lands on /anmelden/bestaetigen and posts email+token here)
+    // stands in for a password. Consuming the token is itself sufficient
+    // proof of email ownership, so this also marks the address verified if
+    // it somehow wasn't yet (e.g. the very first login right after joining).
+    Credentials({
+      id: "magic-link",
+      credentials: { email: {}, token: {} },
+      async authorize(raw) {
+        const emailResult = emailSchema.safeParse(raw?.email);
+        const token = typeof raw?.token === "string" ? raw.token : "";
+        if (!emailResult.success || !token) return null;
+        const email = emailResult.data;
+
+        const limit = checkRateLimit(`magic-login:${email}`, 10, 15 * 60_000);
+        if (!limit.allowed) return null;
+
+        const result = await consumeVerificationToken(token, email, "magic-login");
+        if (!result.ok) return null;
+
+        const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+        if (!user) return null;
+
+        if (!user.emailVerifiedAt) await markEmailVerified(email);
 
         return { id: user.id, email: user.email, role: user.role };
       },

@@ -1,36 +1,47 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { loginSchema, emailSchema } from "@/lib/validation";
-import { resendVerificationEmail } from "@/server/members";
+import { loginSchema, magicLoginRequestSchema } from "@/lib/validation";
+import { requestMagicLogin } from "@/server/magic-login";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 import { fieldErrorsFromZod, type ActionState } from "@/lib/form-state";
 
-export type LoginActionState = ActionState & { unverifiedEmail?: string };
-
-export async function loginAction(
-  _prev: LoginActionState,
+/** Primary member login: request a magic link, no password. */
+export async function requestMagicLoginAction(
+  _prev: ActionState,
   formData: FormData,
-): Promise<LoginActionState> {
+): Promise<ActionState> {
+  const parsed = magicLoginRequestSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+  const { email } = parsed.data;
+
+  const ip = (await headers()).get("x-forwarded-for") ?? "unknown";
+  // Two limits: per-email (a specific inbox can't be spammed) and per-IP
+  // (one visitor can't cycle through many addresses), same reasoning as the
+  // password-reset request.
+  const emailLimit = checkRateLimit(`magic-login-request:${email}`, 5, 15 * 60_000);
+  const ipLimit = checkRateLimit(`magic-login-request-ip:${ip}`, 20, 15 * 60_000);
+  if (!emailLimit.allowed || !ipLimit.allowed) {
+    // Still the generic success message — don't reveal rate limiting exists.
+    return { success: true };
+  }
+
+  await requestMagicLogin(email);
+  return { success: true };
+}
+
+/** Admin-only password login — members never see this form, see LoginForm.tsx. */
+export async function adminLoginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const raw = Object.fromEntries(formData);
   const parsed = loginSchema.safeParse(raw);
   if (!parsed.success) {
     return { fieldErrors: fieldErrorsFromZod(parsed.error) };
   }
   const { email, password } = parsed.data;
-
-  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
-  if (user && !user.emailVerifiedAt) {
-    return {
-      error: "Bitte bestätige zuerst deine E-Mail-Adresse — wir haben dir einen Link geschickt.",
-      unverifiedEmail: email,
-    };
-  }
-
   const callbackUrl = (formData.get("callbackUrl") as string) || "/profil";
 
   try {
@@ -45,25 +56,4 @@ export async function loginAction(
   }
 
   return {};
-}
-
-export async function resendVerificationAction(
-  _prev: LoginActionState,
-  formData: FormData,
-): Promise<LoginActionState> {
-  const parsed = emailSchema.safeParse(formData.get("email"));
-  if (!parsed.success) {
-    return { error: "Ungültige E-Mail-Adresse." };
-  }
-  const email = parsed.data;
-
-  const limit = checkRateLimit(`resend-verification:${email}`, 3, 15 * 60_000);
-  if (!limit.allowed) {
-    // Same generic response either way — don't reveal rate limiting exists
-    // to someone probing for valid emails.
-    return { success: true, unverifiedEmail: email };
-  }
-
-  await resendVerificationEmail(email);
-  return { success: true, unverifiedEmail: email };
 }

@@ -83,7 +83,10 @@ export const users = pgTable("users", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   email: varchar("email", { length: 320 }).notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  // Nullable: members join passwordlessly (magic-link email, see
+  // src/auth.ts's "magic-link" provider) and never get one. Only admin
+  // accounts (created outside the public join flow) have a password.
+  passwordHash: text("password_hash"),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   role: roleEnum("role").notNull().default("member"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -105,7 +108,7 @@ export const verificationTokens = pgTable(
     // SHA-256 hex digest of the token — the raw token is only ever sent in
     // the email link, never stored, so a DB leak can't be used to log in.
     tokenHash: text("token_hash").notNull(),
-    purpose: varchar("purpose", { length: 32 }).notNull(), // 'verify-email' | 'reset-password'
+    purpose: varchar("purpose", { length: 32 }).notNull(), // 'reset-password' | 'magic-login'
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
   },
@@ -207,6 +210,51 @@ export const itnRecords = pgTable(
   },
   (t) => [
     index("itn_records_normalized_name_trgm_idx").using(
+      "gin",
+      sql`${t.normalizedName} gin_trgm_ops`,
+    ),
+  ],
+);
+
+/**
+ * Admin-imported roster of the actual club's members (UTC Neukirchen) —
+ * mirrors itn_imports/itn_records exactly (same purpose, different data:
+ * "is this person really a club member" instead of "what's their rating").
+ * Joining the pyramid (src/server/join.ts) matches the applicant's name
+ * against this table with the same trigram approach as ITN matching, so
+ * membership still isn't automatic even though there's no password to set —
+ * an admin-visible match/no-match, then approval, same as before.
+ */
+export const clubMemberImports = pgTable("club_member_imports", {
+  id: text("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  source: varchar("source", { length: 32 }).notNull(), // 'csv' | 'paste'
+  fileName: text("file_name"),
+  importedBy: text("imported_by").references(() => users.id),
+  importedAt: timestamp("imported_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  rowCount: integer("row_count").notNull().default(0),
+});
+
+export const clubMembers = pgTable(
+  "club_members",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    importId: text("import_id")
+      .notNull()
+      .references(() => clubMemberImports.id, { onDelete: "cascade" }),
+    lastName: varchar("last_name", { length: 100 }).notNull(),
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    birthYear: smallint("birth_year"),
+    email: varchar("email", { length: 320 }),
+    normalizedName: text("normalized_name").notNull(),
+  },
+  (t) => [
+    index("club_members_normalized_name_trgm_idx").using(
       "gin",
       sql`${t.normalizedName} gin_trgm_ops`,
     ),
@@ -595,6 +643,13 @@ export const itnRecordsRelations = relations(itnRecords, ({ one }) => ({
   import: one(itnImports, {
     fields: [itnRecords.importId],
     references: [itnImports.id],
+  }),
+}));
+
+export const clubMembersRelations = relations(clubMembers, ({ one }) => ({
+  import: one(clubMemberImports, {
+    fields: [clubMembers.importId],
+    references: [clubMemberImports.id],
   }),
 }));
 

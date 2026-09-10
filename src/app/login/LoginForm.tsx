@@ -1,39 +1,43 @@
 "use client";
 
-import { useActionState } from "react";
-import { loginAction, resendVerificationAction, type LoginActionState } from "./actions";
+import { useActionState, useState } from "react";
+import Link from "next/link";
+import { requestMagicLoginAction, adminLoginAction } from "./actions";
 import { initialActionState } from "@/lib/form-state";
-
-const initialLoginState: LoginActionState = initialActionState;
 import { Field, FormError, FormSuccess, SubmitButton } from "@/components/form";
 
-function ResendVerificationForm({ email }: { email: string }) {
-  const [state, formAction, pending] = useActionState(resendVerificationAction, initialActionState);
+function MagicLoginForm() {
+  const [state, formAction, pending] = useActionState(requestMagicLoginAction, initialActionState);
 
   if (state.success) {
     return (
-      <FormSuccess message="Falls das Konto existiert und noch nicht bestätigt ist, haben wir einen neuen Link geschickt." />
+      <FormSuccess message="Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Login-Link geschickt." />
     );
   }
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="email" value={email} />
-      <button type="submit" className="text-sm underline text-zinc-600 dark:text-zinc-400">
-        {pending ? "Wird gesendet…" : "Bestätigungslink erneut senden"}
-      </button>
+    <form action={formAction} className="flex flex-col gap-4">
+      <FormError message={state.error} />
+      <Field
+        label="E-Mail"
+        name="email"
+        type="email"
+        autoComplete="email"
+        required
+        error={state.fieldErrors?.email}
+      />
+      <SubmitButton>{pending ? "Wird gesendet…" : "Login-Link anfordern"}</SubmitButton>
     </form>
   );
 }
 
-export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
-  const [state, formAction, pending] = useActionState(loginAction, initialLoginState);
+function AdminLoginForm({ callbackUrl }: { callbackUrl: string }) {
+  const [state, formAction, pending] = useActionState(adminLoginAction, initialActionState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
       <FormError message={state.error} />
-      {state.unverifiedEmail && <ResendVerificationForm email={state.unverifiedEmail} />}
       <Field
         label="E-Mail"
         name="email"
@@ -50,7 +54,34 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
         required
         error={state.fieldErrors?.password}
       />
-      <SubmitButton>{pending ? "Wird geprüft…" : "Anmelden"}</SubmitButton>
+      <SubmitButton>{pending ? "Wird geprüft…" : "Mit Passwort anmelden"}</SubmitButton>
+      <Link href="/passwort-vergessen" className="text-xs text-zinc-500 underline dark:text-zinc-400">
+        Passwort vergessen?
+      </Link>
     </form>
+  );
+}
+
+export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <MagicLoginForm />
+
+      {showAdmin ? (
+        <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <AdminLoginForm callbackUrl={callbackUrl} />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowAdmin(true)}
+          className="text-xs text-zinc-400 underline dark:text-zinc-500"
+        >
+          Admin-Login mit Passwort
+        </button>
+      )}
+    </div>
   );
 }

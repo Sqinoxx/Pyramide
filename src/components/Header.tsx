@@ -52,6 +52,12 @@ export async function Header() {
                   Registrierungen
                 </Link>
                 <Link
+                  href="/admin/mitglieder-import"
+                  className="text-zinc-700 hover:underline dark:text-zinc-300"
+                >
+                  Vereinsmitglieder
+                </Link>
+                <Link
                   href="/admin/itn-import"
                   className="text-zinc-700 hover:underline dark:text-zinc-300"
                 >
@@ -106,10 +112,10 @@ export async function Header() {
               Anmelden
             </Link>
             <Link
-              href="/register"
+              href="/beitreten"
               className="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
             >
-              Registrieren
+              Zur Pyramide anmelden
             </Link>
           </>
         )}
