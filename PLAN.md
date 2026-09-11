@@ -1,6 +1,6 @@
 # Tennis-Forderungspyramide — Projektplan
 
-Stand: 2026-09-06
+Stand: 2026-09-10
 
 **Festgelegte Rahmenentscheidungen**
 - Forderung bis **2 Reihen nach oben**, Sieg = **Positionstausch (Swap)**
@@ -51,13 +51,29 @@ Typmodells über die API-Grenze hinweg.
 - **Admin** — Freischaltung neuer Mitglieder, Regelparameter, ITN-Import,
   Streitfälle, manuelle Korrektur, Saisonstart/-ende, Audit-Log.
 
-### Nutzerreise Registrierung
-1. Registrierung (E-Mail, Passwort, Vor-/Nachname, Geburtsjahr, Geschlecht, Verein).
-2. E-Mail-Verifikation.
-3. **ITN-Abgleich**: System sucht Kandidaten in der importierten OÖTV-Liste
-   → Nutzer bestätigt "das bin ich" oder wählt "kein Eintrag / ohne ITN".
-4. Admin-Freigabe (Vereinszugehörigkeit prüfen) — abschaltbar.
-5. **Einordnung** in die Pyramide (siehe 5.3) → Willkommensmail mit Startposition.
+### Nutzerreise Registrierung (Stand: passwortloser Beitritts-Flow, Commit `f159ec9`)
+Ersetzt den ursprünglich geplanten Passwort-Registrierungs-Flow. Es gibt keinen
+Nutzer-Login mit Passwort mehr — nur der Admin-Account behält eines
+(`src/auth.ts`, Credentials-Provider `credentials`); Mitglieder melden sich
+ausschließlich per Magic-Link an (Provider `magic-link`).
+
+1. **Beitritt** (`/beitreten`): E-Mail, Vor-/Nachname, Geburtsjahr, Geschlecht,
+   Verein — kein Passwort.
+2. **Abgleich gegen `club_members`**: die vom Admin importierte
+   Vereinsmitgliederliste (Trigram-Matching, dieselbe Logik wie der
+   ITN-Import in 5.2) schlägt eine Übereinstimmung vor; der Nutzer bestätigt
+   oder verneint. Ein erkanntes Vereinsmitglied wird **nicht** automatisch
+   freigeschaltet — es beschleunigt nur die Admin-Prüfung.
+3. **ITN-Abgleich** wie bisher (siehe 5.2–5.4).
+4. **Admin-Freigabe** — weiterhin Pflicht für jeden Beitritt, unabhängig vom
+   erkannten Vereinsmitgliedsstatus.
+5. **Login**: Magic-Link per E-Mail (`/anmelden` → Link → `/anmelden/bestaetigen`),
+   kein Passwort-Reset-Flow nötig, da es kein Mitglieder-Passwort gibt.
+6. **Einordnung** in die Pyramide (siehe 5.3) → Willkommensmail mit Startposition.
+
+Admin-Import der Vereinsmitgliederliste ist ein eigener Adminbereich, der die
+ITN-Import-Pipeline spiegelt (eigene Tabelle `club_members`, Migration
+`0005_club_members_and_passwordless.sql`).
 
 ---
 
@@ -246,7 +262,8 @@ höchstens ein nicht abgelöster `member_itn`-Eintrag je Quelle und Mitglied.
 ## 7. Featureliste
 
 ### MVP (spielbar)
-- Registrierung, E-Mail-Verifikation, Login, Passwort-Reset, Profil
+- Beitritt, Admin-Import der Vereinsmitgliederliste mit Matching,
+  passwortloser Magic-Link-Login, Profil
 - Admin-Freigabe von Mitgliedern, Zuordnung zum Bewerb Damen/Herren
 - ITN-Import (CSV/PDF) + Matching + Bestätigung durch Nutzer
 - ITN-Selbsteintrag im Profil inkl. Quellen-Kennzeichnung (5.4)

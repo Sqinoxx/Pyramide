@@ -1,0 +1,42 @@
+# Isolated stack for Playwright E2E tests (npm run test:e2e). Entirely
+# separate from docker-compose.yml's dev/prod services — different ports,
+# throwaway volumes, own Postgres and a Maildev SMTP catcher so tests can
+# read the real magic-link emails the app sends instead of needing a
+# database backdoor for a value (the raw token) that's deliberately never
+# persisted (see src/server/tokens.ts).
+#
+# Lifecycle is managed by e2e/global-setup.ts / e2e/global-teardown.ts, not
+# by hand — plain `docker compose -f docker-compose.e2e.yml up` also works
+# for manual debugging, but `npm run test:e2e` is the normal entry point.
+services:
+  postgres-e2e:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pyramide_e2e
+      POSTGRES_PASSWORD: pyramide_e2e
+      POSTGRES_DB: pyramide_e2e
+    ports:
+      - "127.0.0.1:5435:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pyramide_e2e -d pyramide_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  maildev-e2e:
+    image: maildev/maildev:2.1.0
+    ports:
+      - "127.0.0.1:1081:1080" # web UI + REST API used by e2e/helpers/mail.ts
+      - "127.0.0.1:1026:1025" # SMTP, pointed to by SMTP_HOST/SMTP_PORT below
+    healthcheck:
+      # Override the image's built-in healthcheck: it wget's "localhost",
+      # which resolves to ::1 in this container and fails (maildev only
+      # listens on the IPv4 0.0.0.0 address) — found by watching `docker
+      # compose up --wait` hang with "unhealthy" and checking `docker
+      # inspect`'s health log.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:1080/"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

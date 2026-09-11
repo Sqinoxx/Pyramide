@@ -7,7 +7,7 @@ Siehe [`PLAN.md`](./PLAN.md) für die vollständige Spezifikation.
 ## Stack
 
 Next.js 15 (App Router, TypeScript) · PostgreSQL 16 + Drizzle ORM · Auth.js v5
-· Tailwind CSS · Vitest.
+· Tailwind CSS · Vitest · Playwright.
 
 ## Lokale Entwicklung
 
@@ -33,6 +33,18 @@ npm run test          # Vitest, einmalig
 npm run test:watch    # Vitest im Watch-Modus
 npm run lint
 npx tsc --noEmit
+```
+
+E2E-Tests (Playwright, `e2e/`) laufen gegen eine eigene, isolierte Instanz —
+eigener Postgres + Maildev auf anderen Ports (`docker-compose.e2e.yml`),
+eigener `next dev` auf Port 3100 — und lassen die normale Dev-Instanz
+unberührt. `npm run test:e2e` bringt den Stack hoch, migriert, seedet,
+startet den Server und räumt danach wieder auf; Docker muss laufen, einmalig
+vorher `npx playwright install chromium`.
+
+```bash
+npx playwright install chromium   # einmalig
+npm run test:e2e
 ```
 
 ### Datenbank-Schema ändern

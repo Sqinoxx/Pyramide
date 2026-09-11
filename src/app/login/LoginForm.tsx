@@ -41,6 +41,7 @@ function AdminLoginForm({ callbackUrl }: { callbackUrl: string }) {
       <Field
         label="E-Mail"
         name="email"
+        id="admin-email"
         type="email"
         autoComplete="email"
         required
@@ -49,6 +50,7 @@ function AdminLoginForm({ callbackUrl }: { callbackUrl: string }) {
       <Field
         label="Passwort"
         name="password"
+        id="admin-password"
         type="password"
         autoComplete="current-password"
         required

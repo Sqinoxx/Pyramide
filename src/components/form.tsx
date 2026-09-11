@@ -8,6 +8,7 @@
 export function Field(props: {
   label: string;
   name: string;
+  id?: string;
   type?: string;
   defaultValue?: string;
   required?: boolean;
@@ -15,23 +16,23 @@ export function Field(props: {
   autoComplete?: string;
   placeholder?: string;
 }) {
-  const { label, name, type = "text", error, ...rest } = props;
+  const { label, name, id = name, type = "text", error, ...rest } = props;
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={name} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label htmlFor={id} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
         {label}
       </label>
       <input
-        id={name}
+        id={id}
         name={name}
         type={type}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${name}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         {...rest}
       />
       {error && (
-        <p id={`${name}-error`} className="text-sm text-red-600 dark:text-red-400">
+        <p id={`${id}-error`} className="text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
       )}

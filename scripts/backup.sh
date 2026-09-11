@@ -22,5 +22,15 @@ docker compose exec -T postgres \
 
 echo "Backup written to $OUT"
 
+# Off-site copy: optional, set BACKUP_OFFSITE_CMD in .env to a command that
+# takes the local dump path as $1, e.g. for rclone:
+#   BACKUP_OFFSITE_CMD='rclone copy "$1" remote:pyramide-backups/'
+# Left unset by default — an on-host-only backup still protects against
+# accidental deletion/corruption but not against losing the server itself.
+if [ -n "${BACKUP_OFFSITE_CMD:-}" ]; then
+  eval "$BACKUP_OFFSITE_CMD" '"$OUT"'
+  echo "Off-site copy done."
+fi
+
 # Retention: delete dumps older than 30 days.
 find backups -name 'pyramide_*.sql.gz' -mtime +30 -delete

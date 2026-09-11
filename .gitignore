@@ -46,3 +46,8 @@ next-env.d.ts
 
 # local backups
 /backups
+
+# playwright (npm run test:e2e)
+/test-results
+/playwright-report
+/playwright/.cache
