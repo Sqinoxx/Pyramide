@@ -1,11 +1,14 @@
 import "server-only";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { seasons, positions, positionHistory, members, divisions, challenges } from "@/db/schema";
-import { seedPyramid, type SeedEntry } from "@/lib/pyramid";
+import { positionOfRank, rankOf, seedPyramid, type SeedEntry } from "@/lib/pyramid";
 import { getActiveItnForMember } from "./members";
 import { divisionSettingsSchema, type DivisionSettings } from "@/lib/settings";
+import type { MatchQuotaStatus } from "@/lib/match-quota";
 import { swapMemberPositions } from "./position-swap";
+import { getMatchQuotaStatuses } from "./match-quota";
+import { notifyPositionChange } from "./notifications";
 
 export async function getAllDivisions() {
   return db.query.divisions.findMany({ orderBy: (d, { asc }) => [asc(d.name)] });
@@ -95,6 +98,7 @@ export class SeasonAlreadyActiveError extends Error {
 export async function startSeason(divisionId: string, name: string) {
   const existing = await getActiveSeason(divisionId);
   if (existing) throw new SeasonAlreadyActiveError();
+  // New seasons inherit whatever the admin last configured on /admin/einstellungen.
   const settings = await getDivisionSettings(divisionId);
 
   const divisionMembers = await db.query.members.findMany({
@@ -229,6 +233,74 @@ export async function adminSwapPositions(seasonId: string, memberAId: string, me
   return result;
 }
 
+/**
+ * Manual kick (Mindestspiele nicht erreicht, or any other admin reason):
+ * removes the member's position, closes the gap by moving everyone ranked
+ * below up one rank, and cancels the member's open challenges. The member
+ * account itself stays active — they just no longer have a place in this
+ * season's pyramid.
+ */
+export async function removeMemberFromPyramid(seasonId: string, memberId: string) {
+  const moved = await db.transaction(async (tx) => {
+    const all = await tx
+      .select()
+      .from(positions)
+      .where(eq(positions.seasonId, seasonId))
+      .for("update");
+    const removed = all.find((p) => p.memberId === memberId);
+    if (!removed) throw new MemberNotInSeasonError();
+
+    await tx.delete(positions).where(eq(positions.id, removed.id));
+
+    const removedRank = rankOf(removed);
+    const below = all
+      .filter((p) => rankOf(p) > removedRank)
+      .sort((a, b) => rankOf(a) - rankOf(b));
+    // Ascending order: each move lands on the slot the previous one just
+    // vacated, so the unique (season, row, slot) index never sees a clash.
+    for (const p of below) {
+      const to = positionOfRank(rankOf(p) - 1);
+      await tx
+        .update(positions)
+        .set({ row: to.row, slot: to.slot, since: new Date() })
+        .where(eq(positions.id, p.id));
+      await tx.insert(positionHistory).values({
+        seasonId,
+        memberId: p.memberId,
+        fromRow: p.row,
+        fromSlot: p.slot,
+        toRow: to.row,
+        toSlot: to.slot,
+        reason: "admin",
+      });
+    }
+
+    await tx
+      .update(challenges)
+      .set({ state: "cancelled", resolution: "cancelled", resolvedAt: new Date() })
+      .where(
+        and(
+          eq(challenges.seasonId, seasonId),
+          or(eq(challenges.challengerId, memberId), eq(challenges.defenderId, memberId)),
+          inArray(challenges.state, [
+            "proposed",
+            "accepted",
+            "reported",
+            "disputed",
+            "expired_accept",
+            "expired_play",
+          ]),
+        ),
+      );
+
+    return below.map((p) => p.memberId);
+  });
+
+  for (const id of moved) {
+    await notifyPositionChange(id, "up", "Spieler:in aus der Pyramide entfernt");
+  }
+}
+
 export type PyramidRow = {
   row: number;
   slot: number;
@@ -237,6 +309,8 @@ export type PyramidRow = {
   lastName: string;
   showItnPublicly: boolean;
   itn: Awaited<ReturnType<typeof getActiveItnForMember>>;
+  /** Set only when the Mindestspiele rule shows an hourglass for this member. */
+  quota?: MatchQuotaStatus;
 };
 
 export async function getPyramidView(divisionId: string) {
@@ -257,8 +331,16 @@ export async function getPyramidView(divisionId: string) {
     .where(eq(positions.seasonId, season.id))
     .orderBy(asc(positions.row), asc(positions.slot));
 
+  const quota = await getMatchQuotaStatuses(
+    season.id,
+    rows.map((r) => r.memberId),
+  );
   const withItn: PyramidRow[] = await Promise.all(
-    rows.map(async (r) => ({ ...r, itn: await getActiveItnForMember(r.memberId) })),
+    rows.map(async (r) => ({
+      ...r,
+      itn: await getActiveItnForMember(r.memberId),
+      quota: quota.get(r.memberId),
+    })),
   );
 
   return { season, rows: withItn };

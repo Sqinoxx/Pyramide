@@ -17,5 +17,7 @@ export const ACTION_LABEL: Record<string, string> = {
   admin_clear_leave: "Urlaubsmodus beendet",
   create_announcement: "Ankündigung erstellt",
   delete_announcement: "Ankündigung gelöscht",
+  update_rule_settings: "Regeln geändert",
+  remove_from_pyramid: "Aus Pyramide entfernt",
   import_club_members: "Vereinsmitglieder importiert",
 };

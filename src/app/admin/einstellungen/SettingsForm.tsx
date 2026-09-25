@@ -15,6 +15,7 @@ const GROUPS = [
   { key: "fordern", title: "Fordern" },
   { key: "fristen", title: "Fristen" },
   { key: "inaktivitaet", title: "Inaktivität" },
+  { key: "mindestspiele", title: "Mindestspiele" },
 ] as const;
 
 export function SettingsForm({

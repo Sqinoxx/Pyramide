@@ -25,6 +25,10 @@ export const divisionSettingsSchema = z.object({
   // Not admin-editable: stamped when a pause ends (or the admin resets the
   // counter) so the inactivity job never counts time before it.
   inactivityCountFrom: z.coerce.date().nullable().default(null),
+  // Mindestanzahl an Spielen pro Jahr (0 = Regel aus). Nicht erreicht →
+  // Sanduhr in der Pyramide, danach entfernt der Admin manuell.
+  minMatchesPerYear: z.number().int().min(0).max(52).default(0),
+  minMatchesWarningDays: z.number().int().min(1).max(180).default(30),
 });
 
 export type DivisionSettings = z.infer<typeof divisionSettingsSchema>;
@@ -39,6 +43,8 @@ type BooleanKey = {
   [K in keyof DivisionSettings]: DivisionSettings[K] extends boolean ? K : never;
 }[keyof DivisionSettings];
 
+export type SettingGroup = "fordern" | "fristen" | "inaktivitaet" | "mindestspiele";
+
 /**
  * Admin-editable subset of the settings, with labels for the settings form
  * (src/app/admin/einstellungen). maxOpenOutgoing/-Incoming are deliberately
@@ -46,7 +52,7 @@ type BooleanKey = {
  */
 export const NUMERIC_SETTING_FIELDS: {
   key: NumericKey;
-  group: "fordern" | "fristen" | "inaktivitaet";
+  group: SettingGroup;
   label: string;
   unit: string;
   help?: string;
@@ -95,11 +101,25 @@ export const NUMERIC_SETTING_FIELDS: {
     unit: "Wochen",
     help: "Danach rutscht man eine Position nach unten.",
   },
+  {
+    key: "minMatchesPerYear",
+    group: "mindestspiele",
+    label: "Mindestspiele pro Jahr",
+    unit: "Spiele",
+    help: "0 = Regel aus. Das Jahr zählt ab dem Eintritt in die Pyramide.",
+  },
+  {
+    key: "minMatchesWarningDays",
+    group: "mindestspiele",
+    label: "Sanduhr vor Fristende",
+    unit: "Tage",
+    help: "Ab dann erscheint bei fehlenden Spielen eine Sanduhr in der Pyramide.",
+  },
 ];
 
 export const BOOLEAN_SETTING_FIELDS: {
   key: BooleanKey;
-  group: "fordern" | "fristen" | "inaktivitaet";
+  group: SettingGroup;
   label: string;
   help?: string;
 }[] = [

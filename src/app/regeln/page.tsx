@@ -100,6 +100,20 @@ export default async function RulesPage({
             <p>Für diesen Bewerb gibt es derzeit keine Inaktivitätsregel.</p>
           )}
         </section>
+
+        {s.minMatchesPerYear > 0 && (
+          <section className="card card-body">
+            <h2>Mindestspiele</h2>
+            <p>
+              Pro Jahr (gezählt ab dem Eintritt in die Pyramide) müssen
+              mindestens {s.minMatchesPerYear} Spiele bestritten werden.
+              {" "}{s.minMatchesWarningDays} Tage vor Fristende erscheint bei
+              wem noch Spiele fehlen eine Sanduhr; wird die Anzahl nicht
+              erreicht, bleibt sie sichtbar und ein Admin kann die Person aus
+              der Pyramide entfernen.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );

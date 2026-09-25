@@ -24,6 +24,11 @@ export const ADMIN_SECTIONS = [
     description: "Fristen, Reichweite, Sperrfristen, Pause und Inaktivität.",
   },
   {
+    href: "/admin/regeln",
+    label: "Mindestspiele",
+    description: "Wer die Mindestanzahl an Spielen verfehlt; aus der Pyramide entfernen.",
+  },
+  {
     href: "/admin/forderungen",
     label: "Streitfälle",
     description: "Strittige oder abgelaufene Forderungen entscheiden.",

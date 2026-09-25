@@ -151,3 +151,12 @@ export function BallLogo({ className = "h-8 w-8" }: IconProps) {
     </svg>
   );
 }
+
+export function HourglassIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 3h12M6 21h12" />
+      <path d="M7 3v3a5 5 0 0 0 5 5 5 5 0 0 0 5-5V3M7 21v-3a5 5 0 0 1 5-5 5 5 0 0 1 5 5v3" />
+    </Svg>
+  );
+}

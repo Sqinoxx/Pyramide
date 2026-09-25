@@ -5,6 +5,14 @@ import { createChallengeAction } from "@/app/forderungen/actions";
 import type { PyramidLayout } from "@/lib/pyramid-layout";
 import { EmptyState } from "./ui";
 import { PyramidScroller } from "./PyramidScroller";
+import { HourglassIcon } from "./icons";
+
+function quotaTitle(quota: NonNullable<PyramidRow["quota"]>): string {
+  const date = quota.deadline.toLocaleDateString("de-AT");
+  return quota.state === "overdue"
+    ? `Mindestspiele nicht erreicht (${quota.played}/${quota.required} bis ${date}) — Ausschluss durch Admin möglich`
+    : `Noch ${quota.required - quota.played} Spiel(e) bis ${date} nötig (${quota.played}/${quota.required})`;
+}
 
 function groupByRow(rows: PyramidRow[]): PyramidRow[][] {
   const maxRow = rows.reduce((max, r) => Math.max(max, r.row), 0);
@@ -104,6 +112,20 @@ export function PyramidView({
                     >
                       {rank}
                     </span>
+                    {entry.quota && (
+                      <span
+                        title={quotaTitle(entry.quota)}
+                        aria-label={quotaTitle(entry.quota)}
+                        className={
+                          "absolute top-1.5 left-1.5 " +
+                          (entry.quota.state === "overdue"
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-amber-600 dark:text-amber-400")
+                        }
+                      >
+                        <HourglassIcon className="h-4 w-4" />
+                      </span>
+                    )}
                     {isSelf && (
                       <span
                         className={`absolute font-semibold tracking-wide text-brand-700 uppercase dark:text-brand-300 ${cls.self}`}
