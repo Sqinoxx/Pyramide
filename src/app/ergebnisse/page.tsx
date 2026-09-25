@@ -1,11 +1,6 @@
-import Link from "next/link";
 import { getDivisionByKey, getActiveSeason } from "@/server/seasons";
 import { listRecentResults } from "@/server/challenges";
-
-const DIVISION_LABEL: Record<"herren" | "damen", string> = {
-  herren: "Herren",
-  damen: "Damen",
-};
+import { DivisionTabs, EmptyState, PageHeader } from "@/components/ui";
 
 function formatScore(sets: { gamesA: number; gamesB: number; tiebreakA: number | null; tiebreakB: number | null }[]) {
   return sets
@@ -30,58 +25,63 @@ export default async function ResultsFeedPage({
   const results = season ? await listRecentResults(season.id) : [];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-12">
-      <h1 className="mb-6 text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        Ergebnisse
-      </h1>
+    <div className="page max-w-2xl">
+      <PageHeader center title="Ergebnisse" lead={season?.name} />
 
-      <div className="mb-8 flex justify-center gap-2">
-        {(["herren", "damen"] as const).map((key) => (
-          <Link
-            key={key}
-            href={`/ergebnisse?bewerb=${key}`}
-            className={
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
-              (active === key
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700")
-            }
-          >
-            {DIVISION_LABEL[key]}
-          </Link>
-        ))}
+      <div className="mb-6 flex justify-center sm:mb-8">
+        <DivisionTabs active={active} basePath="/ergebnisse" />
       </div>
 
       {results.length === 0 ? (
-        <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Noch keine Ergebnisse.
-        </p>
+        <EmptyState>Noch keine Ergebnisse.</EmptyState>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="card divide-y divide-line overflow-hidden">
           {results.map((c) => {
             const isWalkover = c.resolution?.startsWith("walkover");
             const winnerIsChallenger = isWalkover
               ? c.resolution === "walkover_challenger"
               : c.match?.winnerId === c.challengerId;
+            const player = (won: boolean, p: { firstName: string; lastName: string }) => (
+              <span
+                className={
+                  "flex items-center gap-2 truncate " +
+                  (won
+                    ? "font-semibold text-zinc-900 dark:text-zinc-50"
+                    : "text-zinc-500 dark:text-zinc-400")
+                }
+              >
+                <span
+                  aria-hidden="true"
+                  className={
+                    "h-2 w-2 shrink-0 rounded-full " + (won ? "bg-brand-500" : "bg-transparent")
+                  }
+                />
+                <span className="truncate">
+                  {p.firstName} {p.lastName}
+                </span>
+              </span>
+            );
             return (
               <li
                 key={c.id}
-                className="flex items-center justify-between rounded-md border border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800"
+                className="flex items-center justify-between gap-4 px-4 py-3 text-sm"
               >
-                <span>
-                  <strong className={winnerIsChallenger ? "" : "font-normal text-zinc-500"}>
-                    {c.challenger.firstName} {c.challenger.lastName}
-                  </strong>
-                  {" – "}
-                  <strong className={!winnerIsChallenger ? "" : "font-normal text-zinc-500"}>
-                    {c.defender.firstName} {c.defender.lastName}
-                  </strong>
-                </span>
-                <span className="text-zinc-500 dark:text-zinc-400">
-                  {isWalkover ? "Walkover" : c.match ? formatScore(c.match.sets) : ""}
-                  {" · "}
-                  {c.resolvedAt && new Date(c.resolvedAt).toLocaleDateString("de-AT")}
-                </span>
+                <div className="flex min-w-0 flex-col gap-1">
+                  {player(winnerIsChallenger, c.challenger)}
+                  {player(!winnerIsChallenger, c.defender)}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+                  {isWalkover ? (
+                    <span className="badge badge-warning">Walkover</span>
+                  ) : (
+                    <span className="font-mono text-sm font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {c.match ? formatScore(c.match.sets) : ""}
+                    </span>
+                  )}
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {c.resolvedAt && new Date(c.resolvedAt).toLocaleDateString("de-AT")}
+                  </span>
+                </div>
               </li>
             );
           })}

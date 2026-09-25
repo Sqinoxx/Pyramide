@@ -1,33 +1,33 @@
 export default function PrivacyPolicyPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="page max-w-2xl">
+      <h1 className="page-title mb-4">
         Datenschutzerklärung
       </h1>
-      <p className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+      <p className="alert alert-warning mb-6">
         <strong>Entwurf.</strong> Beschreibt korrekt, welche Daten diese App
         tatsächlich verarbeitet. Vor dem Livegang die mit [ ] markierten
         Stellen ausfüllen (Verantwortlicher, Hosting-/Mail-Anbieter) und
         idealerweise juristisch gegenprüfen lassen.
       </p>
 
-      <div className="flex flex-col gap-6 text-sm text-zinc-700 dark:text-zinc-300">
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">Verantwortlicher</h2>
+      <div className="prose-page">
+        <section className="card card-body">
+          <h2>Verantwortlicher</h2>
           <p>
             [Vereinsname], [Adresse], [E-Mail] — siehe{" "}
-            <a href="/impressum" className="underline">
+            <a href="/impressum" className="link">
               Impressum
             </a>
             .
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">
+        <section className="card card-body">
+          <h2>
             Welche Daten wir verarbeiten
           </h2>
-          <ul className="list-inside list-disc">
+          <ul>
             <li>
               Bei der Registrierung: Vor- und Nachname, E-Mail-Adresse,
               Passwort (gehasht, nie im Klartext gespeichert), Geburtsjahr,
@@ -45,8 +45,8 @@ export default function PrivacyPolicyPage() {
           </ul>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">Zweck und Rechtsgrundlage</h2>
+        <section className="card card-body">
+          <h2>Zweck und Rechtsgrundlage</h2>
           <p>
             Die Verarbeitung dient der Organisation der vereinsinternen
             Tennis-Forderungspyramide (Art. 6 Abs. 1 lit. b DSGVO,
@@ -55,8 +55,8 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">
+        <section className="card card-body">
+          <h2>
             Öffentliche Sichtbarkeit
           </h2>
           <p>
@@ -69,8 +69,8 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">Auftragsverarbeiter</h2>
+        <section className="card card-body">
+          <h2>Auftragsverarbeiter</h2>
           <p>
             Hosting: [Hosting-Anbieter/Serverstandort]. Mailversand: [SMTP-/
             E-Mail-Anbieter]. Mit beiden besteht ein Auftragsverarbeitungsvertrag
@@ -78,8 +78,8 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">Speicherdauer</h2>
+        <section className="card card-body">
+          <h2>Speicherdauer</h2>
           <p>
             Daten werden gespeichert, solange die Mitgliedschaft bzw. das
             Konto besteht. Backups werden nach 30 Tagen automatisch gelöscht
@@ -87,8 +87,8 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-50">Deine Rechte</h2>
+        <section className="card card-body">
+          <h2>Deine Rechte</h2>
           <p>
             Du hast das Recht auf Auskunft, Berichtigung, Löschung,
             Einschränkung der Verarbeitung, Datenübertragbarkeit und

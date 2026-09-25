@@ -13,11 +13,11 @@ export default async function SeasonAdminPage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-xl px-6 py-16">
-      <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="page max-w-xl">
+      <h1 className="page-title">
         Saisonverwaltung
       </h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="page-lead mb-6">
         Startet eine Pyramide mit allen aktuell freigeschalteten Mitgliedern,
         einsortiert nach ITN. Kann pro Bewerb nur einmal ausgeführt werden,
         solange keine Saison beendet wurde.
@@ -25,7 +25,7 @@ export default async function SeasonAdminPage() {
 
       <ul className="flex flex-col gap-4">
         {withSeason.map(({ division, season, view }) => (
-          <li key={division.id} className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
+          <li key={division.id} className="card card-body">
             <p className="mb-2 font-medium text-zinc-900 dark:text-zinc-50">{division.name}</p>
             {season ? (
               <>

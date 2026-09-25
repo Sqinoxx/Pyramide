@@ -13,7 +13,7 @@ export function ResetPasswordForm({ email, token }: { email: string; token: stri
     return (
       <>
         <FormSuccess message="Dein Passwort wurde geändert." />
-        <Link href="/login" className="mt-4 inline-block text-sm font-medium underline">
+        <Link href="/login" className="btn btn-primary mt-4 w-full">
           Zur Anmeldung
         </Link>
       </>

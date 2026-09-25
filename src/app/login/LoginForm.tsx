@@ -57,7 +57,7 @@ function AdminLoginForm({ callbackUrl }: { callbackUrl: string }) {
         error={state.fieldErrors?.password}
       />
       <SubmitButton>{pending ? "Wird geprüft…" : "Mit Passwort anmelden"}</SubmitButton>
-      <Link href="/passwort-vergessen" className="text-xs text-zinc-500 underline dark:text-zinc-400">
+      <Link href="/passwort-vergessen" className="link w-fit text-sm">
         Passwort vergessen?
       </Link>
     </form>
@@ -72,14 +72,14 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
       <MagicLoginForm />
 
       {showAdmin ? (
-        <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
+        <div className="border-t border-line pt-6">
           <AdminLoginForm callbackUrl={callbackUrl} />
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setShowAdmin(true)}
-          className="text-xs text-zinc-400 underline dark:text-zinc-500"
+          className="btn btn-ghost btn-sm mx-auto"
         >
           Admin-Login mit Passwort
         </button>

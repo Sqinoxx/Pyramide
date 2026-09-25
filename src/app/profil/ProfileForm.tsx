@@ -17,10 +17,12 @@ export function ProfileForm(props: {
     <form action={formAction} className="flex flex-col gap-4">
       <FormError message={state.error} />
       <FormSuccess message={state.success ? "Gespeichert." : undefined} />
-      <Field label="Verein" name="club" defaultValue={props.club ?? ""} />
-      <Field label="Telefon" name="phone" type="tel" defaultValue={props.phone ?? ""} />
-      <div className="flex flex-col gap-1">
-        <label htmlFor="preferredTimes" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Verein" name="club" defaultValue={props.club ?? ""} />
+        <Field label="Telefon" name="phone" type="tel" defaultValue={props.phone ?? ""} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="preferredTimes" className="label">
           Bevorzugte Spielzeiten
         </label>
         <textarea
@@ -29,7 +31,7 @@ export function ProfileForm(props: {
           rows={2}
           defaultValue={props.preferredTimes ?? ""}
           placeholder="z. B. Werktags ab 18 Uhr, Wochenende vormittags"
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="input"
         />
       </div>
       <CheckboxField
@@ -37,9 +39,9 @@ export function ProfileForm(props: {
         name="showItnPublicly"
         defaultChecked={props.showItnPublicly}
       />
-      <div>
-        <SubmitButton>{pending ? "Wird gespeichert…" : "Speichern"}</SubmitButton>
-      </div>
+      <SubmitButton className="w-full sm:w-fit">
+        {pending ? "Wird gespeichert…" : "Speichern"}
+      </SubmitButton>
     </form>
   );
 }

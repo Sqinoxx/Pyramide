@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
 import { getMemberByUserId } from "@/server/members";
 import { getViewerChallengeOverview } from "@/server/challenges";
 import { listPublishedAnnouncements } from "@/server/announcements";
 import { PyramidView } from "@/components/PyramidView";
+import { DivisionTabs, EmptyState, PageHeader } from "@/components/ui";
+import { PyramidLayoutToggle } from "@/components/PyramidLayoutToggle";
+import { PYRAMID_LAYOUT_COOKIE, parsePyramidLayout } from "@/lib/pyramid-layout";
 import { ViewerStatus } from "@/components/ViewerStatus";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
@@ -20,6 +24,8 @@ export default async function Home({
   const { bewerb } = await searchParams;
   const active: "herren" | "damen" = bewerb === "damen" ? "damen" : "herren";
 
+  const layout = parsePyramidLayout((await cookies()).get(PYRAMID_LAYOUT_COOKIE)?.value);
+
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
   const announcements = division
@@ -34,9 +40,7 @@ export default async function Home({
 
   let viewerMemberId: string | undefined;
   let eligibleMemberIds: Set<string> | undefined;
-  let overview:
-    | Awaited<ReturnType<typeof getViewerChallengeOverview>>
-    | undefined;
+  let overview: Awaited<ReturnType<typeof getViewerChallengeOverview>> | undefined;
   if (member && playsHere && view) {
     viewerMemberId = member.id;
     overview = await getViewerChallengeOverview(view.season.id, member.id);
@@ -44,78 +48,73 @@ export default async function Home({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 py-12">
-      <div className="mb-8 flex flex-col items-center gap-1 text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          UTC Pyramide
-        </p>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Tennis-Forderungspyramide
-        </h1>
-      </div>
+    <div className="page max-w-6xl">
+      <PageHeader
+        center
+        eyebrow="UTC Pyramide"
+        title="Tennis-Forderungspyramide"
+        lead={view ? view.season.name : undefined}
+      />
 
-      <div className="mb-8 flex justify-center gap-2">
-        {(["herren", "damen"] as const).map((key) => (
-          <Link
-            key={key}
-            href={`/?bewerb=${key}`}
-            className={
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
-              (active === key
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700")
-            }
-          >
-            {DIVISION_LABEL[key]}
-          </Link>
-        ))}
+      <div className="mb-6 flex items-center justify-center gap-2 sm:mb-8">
+        <DivisionTabs active={active} basePath="/" />
+        {view && view.rows.length > 0 && <PyramidLayoutToggle layout={layout} bewerb={active} />}
       </div>
 
       {announcements.length > 0 && (
-        <div className="mb-8 flex flex-col gap-2">
+        <div className="mx-auto mb-6 flex max-w-2xl flex-col gap-2 sm:mb-8">
           {announcements.map((a) => (
-            <div
-              key={a.id}
-              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm dark:border-amber-900 dark:bg-amber-950"
-            >
-              <p className="font-medium text-amber-900 dark:text-amber-200">
-                {a.title}
-              </p>
-              <p className="whitespace-pre-line text-amber-800 dark:text-amber-300">
-                {a.bodyMd}
-              </p>
+            <div key={a.id} className="alert alert-warning">
+              <p className="font-semibold">{a.title}</p>
+              <p className="mt-0.5 whitespace-pre-line opacity-90">{a.bodyMd}</p>
             </div>
           ))}
         </div>
       )}
 
       {member && (
-        <ViewerStatus
-          firstName={member.firstName}
-          lastName={member.lastName}
-          divisionKey={member.division?.key ?? null}
-          otherDivisionKey={
-            member.division && !playsHere ? member.division.key : undefined
-          }
-          seasonId={view?.season.id}
-          position={overview?.position ?? null}
-          blockedBy={view ? (overview?.blockedBy ?? null) : "not_placed"}
-          onLeaveUntil={overview?.onLeaveUntil ?? null}
-          eligible={overview?.eligible}
-        />
+        <div className="mx-auto mb-6 max-w-2xl sm:mb-8">
+          <ViewerStatus
+            firstName={member.firstName}
+            lastName={member.lastName}
+            divisionKey={member.division?.key ?? null}
+            otherDivisionKey={member.division && !playsHere ? member.division.key : undefined}
+            seasonId={view?.season.id}
+            position={overview?.position ?? null}
+            blockedBy={view ? (overview?.blockedBy ?? null) : "not_placed"}
+            onLeaveUntil={overview?.onLeaveUntil ?? null}
+            eligible={overview?.eligible}
+          />
+        </div>
       )}
 
       {view ? (
         <PyramidView
+          layout={layout}
           rows={view.rows}
           seasonId={view.season.id}
           viewerMemberId={viewerMemberId}
           eligibleMemberIds={eligibleMemberIds}
         />
       ) : (
-        <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Für {DIVISION_LABEL[active]} wurde noch keine Pyramide gestartet.
-        </p>
+        <EmptyState>Für {DIVISION_LABEL[active]} wurde noch keine Pyramide gestartet.</EmptyState>
+      )}
+
+      {!session?.user && (
+        <div className="card card-body mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+          <div className="flex-1">
+            <p className="font-semibold text-zinc-900 dark:text-zinc-50">Mitspielen?</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Melde dich an, fordere andere Vereinsmitglieder heraus und klettere nach oben.{" "}
+              <Link href="/regeln" className="link">
+                Regeln
+              </Link>
+            </p>
+          </div>
+          <Link href="/beitreten" className="btn btn-primary w-full sm:w-auto">
+            Jetzt anmelden
+          </Link>
+        </div>
       )}
     </div>
   );

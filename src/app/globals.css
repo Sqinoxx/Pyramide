@@ -1,26 +1,181 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Court green is the brand colour, "ball" is the tennis-ball
+ * accent. Surfaces are slightly tinted so white cards stand out on mobile.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f6f3;
+  --foreground: #18181b;
+  --surface: #ffffff;
+  --surface-muted: #f1f2ee;
+  --border: #e4e5e0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0d0c;
+    --foreground: #ededed;
+    --surface: #151816;
+    --surface-muted: #1c201d;
+    --border: #2a2f2b;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-brand-50: #eefbf3;
+  --color-brand-100: #d5f5e1;
+  --color-brand-200: #aeeac7;
+  --color-brand-300: #79d8a5;
+  --color-brand-400: #43be7f;
+  --color-brand-500: #20a263;
+  --color-brand-600: #14834f;
+  --color-brand-700: #126842;
+  --color-brand-800: #125337;
+  --color-brand-900: #10442f;
+  --color-brand-950: #07261a;
+  --color-ball: #d7f34a;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: 5rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer components {
+  /* ---------- Page scaffolding ---------- */
+  .page {
+    @apply mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-12;
+  }
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50;
+  }
+  .page-lead {
+    @apply mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-400;
+  }
+  .section-title {
+    @apply mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase dark:text-zinc-400;
+  }
+
+  /* ---------- Surfaces ---------- */
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-sm shadow-zinc-900/[0.03];
+  }
+  .card-body {
+    @apply p-4 sm:p-5;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium whitespace-nowrap transition-colors select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:pointer-events-none disabled:opacity-50 sm:min-h-10;
+  }
+  .btn-sm {
+    @apply min-h-9 rounded-lg px-3 text-sm sm:min-h-8 sm:text-xs;
+  }
+  .btn-primary {
+    @apply bg-brand-700 text-white hover:bg-brand-800 active:bg-brand-900 dark:bg-brand-500 dark:text-brand-950 dark:hover:bg-brand-400;
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface text-zinc-800 hover:bg-surface-muted dark:text-zinc-200;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  }
+  .btn-ghost {
+    @apply text-zinc-600 hover:bg-surface-muted hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100;
+  }
+
+  /* ---------- Form controls ---------- */
+  .label {
+    @apply text-sm font-medium text-zinc-700 dark:text-zinc-300;
+  }
+  /* text-base on phones keeps iOS Safari from zooming into focused inputs. */
+  .input {
+    @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base text-zinc-900 shadow-sm shadow-zinc-900/[0.02] transition-colors outline-none placeholder:text-zinc-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 sm:min-h-10 sm:text-sm dark:text-zinc-100 dark:placeholder:text-zinc-500;
+  }
+  .field-error {
+    @apply text-sm text-red-600 dark:text-red-400;
+  }
+  .hint {
+    @apply text-xs leading-relaxed text-zinc-500 dark:text-zinc-400;
+  }
+
+  /* ---------- Feedback ---------- */
+  .alert {
+    @apply rounded-xl border px-4 py-3 text-sm leading-relaxed;
+  }
+  .alert-error {
+    @apply border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-200;
+  }
+  .alert-success {
+    @apply border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-900 dark:bg-brand-950/60 dark:text-brand-200;
+  }
+  .alert-warning {
+    @apply border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-200;
+  }
+  .alert-info {
+    @apply border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/50 dark:text-sky-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .badge-neutral {
+    @apply bg-surface-muted text-zinc-600 dark:text-zinc-300;
+  }
+  .badge-brand {
+    @apply bg-brand-100 text-brand-800 dark:bg-brand-900/60 dark:text-brand-200;
+  }
+  .badge-warning {
+    @apply bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200;
+  }
+  .badge-danger {
+    @apply bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200;
+  }
+
+  .link {
+    @apply font-medium text-brand-700 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-600 dark:text-brand-300 dark:decoration-brand-700;
+  }
+
+  /* ---------- Segmented control (Herren / Damen) ---------- */
+  .segmented {
+    @apply inline-flex rounded-xl border border-line bg-surface p-1 shadow-sm;
+  }
+  .segmented-item {
+    @apply inline-flex min-h-9 min-w-24 items-center justify-center rounded-lg px-4 text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100;
+  }
+  .segmented-item[aria-current="page"],
+  .segmented-item[aria-pressed="true"] {
+    @apply bg-brand-700 text-white shadow-sm hover:text-white dark:bg-brand-500 dark:text-brand-950;
+  }
+
+  /* ---------- Long-form text (Regeln, Impressum, Datenschutz) ---------- */
+  .prose-page {
+    @apply flex flex-col gap-4 text-sm leading-relaxed text-zinc-700 sm:text-base dark:text-zinc-300;
+  }
+  .prose-page h2 {
+    @apply mb-2 text-base font-semibold text-zinc-900 dark:text-zinc-50;
+  }
+  .prose-page ul {
+    @apply list-outside list-disc space-y-1 pl-5;
+  }
+  .prose-page a {
+    @apply font-medium text-brand-700 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-600 dark:text-brand-300 dark:decoration-brand-700;
+  }
 }

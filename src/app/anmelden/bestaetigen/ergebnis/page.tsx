@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthCard } from "@/components/ui";
 
 /**
  * Reached only on failure — a successful confirm redirects straight to
@@ -10,17 +11,14 @@ import Link from "next/link";
  */
 export default function ConfirmMagicLoginResultPage() {
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16 text-center">
-      <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        Link ungültig oder abgelaufen
-      </h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        Dieser Anmelde-Link wurde schon verwendet oder ist abgelaufen. Fordere
-        einfach einen neuen an.
-      </p>
-      <Link href="/login" className="text-sm font-medium underline">
+    <AuthCard
+      center
+      title="Link ungültig oder abgelaufen"
+      lead="Dieser Anmelde-Link wurde schon verwendet oder ist abgelaufen. Fordere einfach einen neuen an."
+    >
+      <Link href="/login" className="btn btn-primary w-full">
         Neuen Login-Link anfordern
       </Link>
-    </div>
+    </AuthCard>
   );
 }

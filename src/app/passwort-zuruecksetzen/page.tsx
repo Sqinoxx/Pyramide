@@ -1,3 +1,4 @@
+import { AuthCard } from "@/components/ui";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
 export default async function ResetPasswordPage({
@@ -9,23 +10,13 @@ export default async function ResetPasswordPage({
 
   if (!email || !token) {
     return (
-      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Ungültiger Link
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Dieser Link zum Zurücksetzen ist unvollständig.
-        </p>
-      </div>
+      <AuthCard center title="Ungültiger Link" lead="Dieser Link zum Zurücksetzen ist unvollständig." />
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        Neues Passwort vergeben
-      </h1>
+    <AuthCard title="Neues Passwort vergeben">
       <ResetPasswordForm email={email} token={token} />
-    </div>
+    </AuthCard>
   );
 }

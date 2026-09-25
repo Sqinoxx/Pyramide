@@ -18,8 +18,8 @@ export function Field(props: {
 }) {
   const { label, name, id = name, type = "text", error, ...rest } = props;
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="label">
         {label}
       </label>
       <input
@@ -28,11 +28,11 @@ export function Field(props: {
         type={type}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        className="input"
         {...rest}
       />
       {error && (
-        <p id={`${id}-error`} className="text-sm text-red-600 dark:text-red-400">
+        <p id={`${id}-error`} className="field-error">
           {error}
         </p>
       )}
@@ -50,14 +50,14 @@ export function SelectField(props: {
 }) {
   const { label, name, options, error, ...rest } = props;
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={name} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={name} className="label">
         {label}
       </label>
       <select
         id={name}
         name={name}
-        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        className="input"
         {...rest}
       >
         <option value="" disabled>
@@ -69,7 +69,7 @@ export function SelectField(props: {
           </option>
         ))}
       </select>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }
@@ -81,13 +81,16 @@ export function CheckboxField(props: {
 }) {
   const { label, name, defaultChecked } = props;
   return (
-    <label htmlFor={name} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+    <label
+      htmlFor={name}
+      className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300"
+    >
       <input
         id={name}
         name={name}
         type="checkbox"
         defaultChecked={defaultChecked}
-        className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+        className="h-5 w-5 shrink-0 rounded accent-brand-600"
       />
       {label}
     </label>
@@ -99,7 +102,7 @@ export function FormError({ message }: { message?: string }) {
   return (
     <p
       role="alert"
-      className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+      className="alert alert-error"
     >
       {message}
     </p>
@@ -111,19 +114,22 @@ export function FormSuccess({ message }: { message?: string }) {
   return (
     <p
       role="status"
-      className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300"
+      className="alert alert-success"
     >
       {message}
     </p>
   );
 }
 
-export function SubmitButton({ children }: { children: React.ReactNode }) {
+export function SubmitButton({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <button
-      type="submit"
-      className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-    >
+    <button type="submit" className={`btn btn-primary ${className}`}>
       {children}
     </button>
   );

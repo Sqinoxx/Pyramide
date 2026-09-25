@@ -13,14 +13,14 @@ export function StartSeasonForm({ divisionId, divisionName }: { divisionId: stri
   }
 
   return (
-    <form action={formAction} className="flex items-end gap-3">
+    <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">
       <input type="hidden" name="divisionId" value={divisionId} />
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Saisonname</label>
+      <div className="flex flex-1 flex-col gap-1.5">
+        <label className="label">Saisonname</label>
         <input
           name="name"
           defaultValue={`Saison ${new Date().getFullYear()}`}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         />
       </div>
       <SubmitButton>{pending ? "Wird gestartet…" : `${divisionName}-Pyramide starten`}</SubmitButton>

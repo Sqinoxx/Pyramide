@@ -46,39 +46,33 @@ export function ViewerStatus({
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 
   return (
-    <section className="mb-8 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950">
+    <section className="card card-body">
       <div className="flex items-center gap-3">
         <span
-          aria-hidden
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white"
+          aria-hidden="true"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white dark:bg-brand-500 dark:text-brand-950"
         >
           {initials}
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          <p className="text-xs font-medium tracking-wide text-brand-700 uppercase dark:text-brand-400">
             Angemeldet als
           </p>
           <p className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
             {firstName} {lastName}
           </p>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {divisionKey
-              ? (DIVISION_LABEL[divisionKey] ?? divisionKey)
-              : "Kein Bewerb"}
+            {divisionKey ? (DIVISION_LABEL[divisionKey] ?? divisionKey) : "Kein Bewerb"}
             {position && <> · Platz {rankOf(position)}</>}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 border-t border-emerald-200 pt-3 dark:border-emerald-900">
+      <div className="mt-4 border-t border-line pt-3">
         {otherDivisionKey ? (
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            Du spielst bei den{" "}
-            {DIVISION_LABEL[otherDivisionKey] ?? otherDivisionKey}.{" "}
-            <Link
-              href={`/?bewerb=${otherDivisionKey}`}
-              className="font-medium underline"
-            >
+            Du spielst bei den {DIVISION_LABEL[otherDivisionKey] ?? otherDivisionKey}.{" "}
+            <Link href={`/?bewerb=${otherDivisionKey}`} className="link">
               Zu deiner Pyramide
             </Link>
           </p>
@@ -88,10 +82,7 @@ export function ViewerStatus({
           </p>
         ) : blockedBy ? (
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            <BlockedMessage
-              reason={blockedBy}
-              onLeaveUntil={onLeaveUntil ?? null}
-            />
+            <BlockedMessage reason={blockedBy} onLeaveUntil={onLeaveUntil ?? null} />
           </p>
         ) : eligible && eligible.length > 0 && seasonId ? (
           <>
@@ -105,7 +96,7 @@ export function ViewerStatus({
                 .map((e) => (
                   <li
                     key={e.memberId}
-                    className="flex items-center gap-2 rounded-full border border-emerald-300 bg-white py-1 pl-3 pr-1 text-sm dark:border-emerald-800 dark:bg-zinc-900"
+                    className="flex items-center gap-2 rounded-full border border-brand-200 bg-surface py-1 pl-3 pr-1 text-sm dark:border-brand-900"
                   >
                     <span className="tabular-nums text-zinc-400 dark:text-zinc-500">
                       {rankOf(e)}
@@ -115,15 +106,8 @@ export function ViewerStatus({
                     </span>
                     <form action={createChallengeAction}>
                       <input type="hidden" name="seasonId" value={seasonId} />
-                      <input
-                        type="hidden"
-                        name="defenderId"
-                        value={e.memberId}
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-medium text-white hover:bg-emerald-700"
-                      >
+                      <input type="hidden" name="defenderId" value={e.memberId} />
+                      <button type="submit" className="btn btn-primary btn-sm rounded-full px-2.5">
                         Fordern
                       </button>
                     </form>
@@ -133,8 +117,8 @@ export function ViewerStatus({
           </>
         ) : (
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            Aktuell kannst du niemanden fordern – alle Personen in Reichweite
-            sind gerade gebunden, im Urlaub oder in der Sperrfrist.
+            Aktuell kannst du niemanden fordern – alle Personen in Reichweite sind
+            gerade gebunden, im Urlaub oder in der Sperrfrist.
           </p>
         )}
       </div>
@@ -153,27 +137,20 @@ function BlockedMessage({
     case "not_placed":
       return <>Du bist in der aktuellen Pyramide noch nicht platziert.</>;
     case "inactive":
-      return (
-        <>
-          Dein Konto ist noch nicht aktiv – daher kannst du noch niemanden
-          fordern.
-        </>
-      );
+      return <>Dein Konto ist noch nicht aktiv – daher kannst du noch niemanden fordern.</>;
     case "on_leave":
       return (
         <>
           Du bist im Urlaubsmodus
-          {onLeaveUntil && (
-            <> bis {onLeaveUntil.toLocaleDateString("de-AT")}</>
-          )}{" "}
-          und kannst aktuell nicht fordern.
+          {onLeaveUntil && <> bis {onLeaveUntil.toLocaleDateString("de-AT")}</>} und kannst
+          aktuell nicht fordern.
         </>
       );
     case "open_challenge":
       return (
         <>
           Du hast bereits eine offene Forderung.{" "}
-          <Link href="/forderungen" className="font-medium underline">
+          <Link href="/forderungen" className="link">
             Zu deinen Forderungen
           </Link>
         </>

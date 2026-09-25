@@ -8,6 +8,7 @@ import { ProfileForm } from "./ProfileForm";
 import { SelfItnForm } from "./SelfItnForm";
 import { LeaveForm } from "./LeaveForm";
 import { confirmOwnItnMatchAction, dismissOwnItnMatchAction } from "./actions";
+import { Notice } from "@/components/ui";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Warten auf Freigabe",
@@ -24,9 +25,7 @@ export default async function ProfilePage() {
 
   if (!member) {
     return (
-      <div className="mx-auto max-w-lg px-6 py-16 text-center text-zinc-600 dark:text-zinc-400">
-        Zu diesem Konto existiert kein Mitgliedsprofil. Bitte wende dich an einen Admin.
-      </div>
+      <Notice>Zu diesem Konto existiert kein Mitgliedsprofil. Bitte wende dich an einen Admin.</Notice>
     );
   }
 
@@ -39,115 +38,134 @@ export default async function ProfilePage() {
   const season = member.divisionId ? await getActiveSeason(member.divisionId) : null;
   const stats = season ? await getMemberStats(season.id, member.id) : null;
 
+  const initials = `${member.firstName[0] ?? ""}${member.lastName[0] ?? ""}`.toUpperCase();
+
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-6 py-16">
-      <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        {member.firstName} {member.lastName}
-      </h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        {member.division?.name ?? "Kein Bewerb"} · {STATUS_LABEL[member.status]}
-      </p>
-
-      {member.status === "pending" && (
-        <div className="mb-8 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Deine Registrierung wartet auf Freigabe durch einen Admin. Sobald du
-          freigeschaltet bist, wirst du in die Pyramide aufgenommen.
-        </div>
-      )}
-
-      {match.candidates.length > 0 && (
-        <section className="mb-8 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
-          <h2 className="mb-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
-            Bist du das?
-          </h2>
-          <ul className="flex flex-col gap-2">
-            {match.candidates.map((c) => (
-              <li
-                key={c.itnRecordId}
-                className="flex items-center justify-between rounded bg-white px-3 py-2 text-sm dark:bg-zinc-900"
-              >
-                <span>
-                  {c.firstName} {c.lastName} · Jg. {c.birthYear ?? "?"} ·{" "}
-                  {c.club ?? "kein Verein"} · ITN {c.itn.toFixed(1)}
-                </span>
-                <span className="flex gap-2">
-                  <form action={confirmOwnItnMatchAction}>
-                    <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
-                    <button
-                      type="submit"
-                      className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    >
-                      Das bin ich
-                    </button>
-                  </form>
-                  <form action={dismissOwnItnMatchAction}>
-                    <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700"
-                    >
-                      Nicht ich
-                    </button>
-                  </form>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {stats && (
-        <section className="mb-8">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Statistik
-          </h2>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            Bilanz: <strong>{stats.wins}</strong> Siege – <strong>{stats.losses}</strong> Niederlagen
-            {stats.currentStreak && (
-              <>
-                {" · "}
-                {stats.currentStreak.count}{" "}
-                {stats.currentStreak.type === "win" ? "Siege" : "Niederlagen"} in Serie
-              </>
-            )}
-            {stats.bestRow && <> · Bestplatzierung: Reihe {stats.bestRow}</>}
+    <div className="page max-w-2xl">
+      <div className="mb-6 flex items-center gap-4 sm:mb-8">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-700 text-lg font-semibold text-white sm:h-16 sm:w-16 sm:text-xl dark:bg-brand-500 dark:text-brand-950">
+          {initials}
+        </span>
+        <div className="min-w-0">
+          <h1 className="page-title truncate">
+            {member.firstName} {member.lastName}
+          </h1>
+          <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
+            {member.division?.name ?? "Kein Bewerb"} · {STATUS_LABEL[member.status]}
           </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:gap-5">
+        {member.status === "pending" && (
+          <div className="alert alert-warning">
+            Deine Registrierung wartet auf Freigabe durch einen Admin. Sobald du
+            freigeschaltet bist, wirst du in die Pyramide aufgenommen.
+          </div>
+        )}
+
+        {match.candidates.length > 0 && (
+          <section className="alert alert-info">
+            <h2 className="mb-2 font-semibold">Bist du das?</h2>
+            <ul className="flex flex-col gap-2">
+              {match.candidates.map((c) => (
+                <li
+                  key={c.itnRecordId}
+                  className="flex flex-col gap-3 rounded-xl bg-surface px-3 py-3 text-sm text-zinc-800 sm:flex-row sm:items-center sm:justify-between dark:text-zinc-200"
+                >
+                  <span>
+                    <strong className="font-medium">
+                      {c.firstName} {c.lastName}
+                    </strong>
+                    <span className="block text-zinc-500 dark:text-zinc-400">
+                      Jg. {c.birthYear ?? "?"} · {c.club ?? "kein Verein"} · ITN {c.itn.toFixed(1)}
+                    </span>
+                  </span>
+                  <span className="grid grid-cols-2 gap-2 sm:flex">
+                    <form action={confirmOwnItnMatchAction}>
+                      <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
+                      <button type="submit" className="btn btn-primary btn-sm w-full">
+                        Das bin ich
+                      </button>
+                    </form>
+                    <form action={dismissOwnItnMatchAction}>
+                      <input type="hidden" name="itnRecordId" value={c.itnRecordId} />
+                      <button type="submit" className="btn btn-secondary btn-sm w-full">
+                        Nicht ich
+                      </button>
+                    </form>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {stats && (
+          <section className="card card-body">
+            <h2 className="section-title">Statistik</h2>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="Siege" value={stats.wins} />
+              <Stat label="Niederlagen" value={stats.losses} />
+              <Stat
+                label={
+                  stats.currentStreak?.type === "loss" ? "Niederlagen in Serie" : "Siege in Serie"
+                }
+                value={stats.currentStreak?.count ?? 0}
+              />
+              <Stat
+                label="Bestplatzierung"
+                value={stats.bestRow ? `Reihe ${stats.bestRow}` : "—"}
+              />
+            </dl>
+          </section>
+        )}
+
+        <section className="card card-body">
+          <h2 className="section-title">ITN</h2>
+          <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
+            {activeItn ? (
+              <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                {formatItnBadge(activeItn)}
+              </span>
+            ) : (
+              "Noch keine ITN hinterlegt."
+            )}
+            {activeItn?.mismatchWithSelf && (
+              <span className="mt-1 block text-amber-700 dark:text-amber-400">
+                Weicht deutlich von deiner eigenen Angabe ab.
+              </span>
+            )}
+          </p>
+          <SelfItnForm currentValue={activeItn?.source === "self" ? activeItn.value : null} />
         </section>
-      )}
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          ITN
-        </h2>
-        <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
-          {activeItn ? formatItnBadge(activeItn) : "Noch keine ITN hinterlegt."}
-          {activeItn?.mismatchWithSelf && (
-            <span className="ml-2 text-amber-600 dark:text-amber-400">
-              (weicht deutlich von deiner eigenen Angabe ab)
-            </span>
-          )}
-        </p>
-        <SelfItnForm currentValue={activeItn?.source === "self" ? activeItn.value : null} />
-      </section>
+        <section className="card card-body">
+          <h2 className="section-title">Profil</h2>
+          <ProfileForm
+            club={member.club}
+            phone={member.phone}
+            preferredTimes={member.preferredTimes}
+            showItnPublicly={member.showItnPublicly}
+          />
+        </section>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Profil
-        </h2>
-        <ProfileForm
-          club={member.club}
-          phone={member.phone}
-          preferredTimes={member.preferredTimes}
-          showItnPublicly={member.showItnPublicly}
-        />
-      </section>
+        <section className="card card-body">
+          <h2 className="section-title">Urlaubs-/Verletzungsmodus</h2>
+          <LeaveForm onLeaveUntil={member.onLeaveUntil?.toISOString() ?? null} />
+        </section>
+      </div>
+    </div>
+  );
+}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Urlaubs-/Verletzungsmodus
-        </h2>
-        <LeaveForm onLeaveUntil={member.onLeaveUntil?.toISOString() ?? null} />
-      </section>
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-surface-muted px-3 py-3">
+      <dt className="text-xs text-zinc-500 dark:text-zinc-400">{label}</dt>
+      <dd className="mt-0.5 text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+        {value}
+      </dd>
     </div>
   );
 }

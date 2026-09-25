@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { getMemberByUserId, listActiveMembers } from "@/server/members";
 import { ContactForm } from "./ContactForm";
+import { EmptyState, PageHeader } from "@/components/ui";
 
 export default async function MembersDirectoryPage({
   searchParams,
@@ -13,46 +14,51 @@ export default async function MembersDirectoryPage({
   const members = await listActiveMembers(q);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        Mitglieder
-      </h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        Kontakt läuft über eine Nachricht in der App — Telefonnummern und
-        E-Mail-Adressen bleiben privat.
-      </p>
+    <div className="page max-w-2xl">
+      <PageHeader
+        title="Mitglieder"
+        lead="Kontakt läuft über eine Nachricht in der App — Telefonnummern und E-Mail-Adressen bleiben privat."
+      />
 
-      <form className="mb-6" action="/mitglieder">
+      <form className="mb-6" action="/mitglieder" role="search">
         <input
           type="search"
           name="q"
           defaultValue={q ?? ""}
           placeholder="Name oder Verein suchen…"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          aria-label="Mitglieder suchen"
+          className="input"
         />
       </form>
 
-      <ul className="flex flex-col gap-2">
-        {members.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center justify-between rounded-md border border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800"
-          >
-            <div>
-              <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                {m.firstName} {m.lastName}
-              </p>
-              <p className="text-zinc-500 dark:text-zinc-400">
-                {m.division?.name} {m.club ? `· ${m.club}` : ""}
-              </p>
-            </div>
-            {self && self.id !== m.id && <ContactForm toMemberId={m.id} />}
-          </li>
-        ))}
-        {members.length === 0 && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Keine Treffer.</p>
-        )}
-      </ul>
+      {members.length === 0 ? (
+        <EmptyState>Keine Treffer.</EmptyState>
+      ) : (
+        <ul className="card divide-y divide-line overflow-hidden">
+          {members.map((m) => (
+            <li
+              key={m.id}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3 px-4 py-3 text-sm"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+                  {m.firstName[0]}
+                  {m.lastName[0]}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
+                    {m.firstName} {m.lastName}
+                  </p>
+                  <p className="truncate text-zinc-500 dark:text-zinc-400">
+                    {m.division?.name} {m.club ? `· ${m.club}` : ""}
+                  </p>
+                </div>
+              </div>
+              {self && self.id !== m.id && <ContactForm toMemberId={m.id} />}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
