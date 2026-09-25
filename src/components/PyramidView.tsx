@@ -1,5 +1,4 @@
 import type { PyramidRow } from "@/server/seasons";
-import { formatItnBadge } from "@/lib/itn-precedence";
 import { rankOf } from "@/lib/pyramid";
 import { createChallengeAction } from "@/app/forderungen/actions";
 
@@ -77,11 +76,6 @@ export function PyramidView({
                     <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {entry.firstName} {entry.lastName}
                     </span>
-                    {entry.itn && entry.showItnPublicly && (
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {formatItnBadge(entry.itn)}
-                      </span>
-                    )}
                     {canChallenge && seasonId && (
                       <form action={createChallengeAction}>
                         <input type="hidden" name="seasonId" value={seasonId} />

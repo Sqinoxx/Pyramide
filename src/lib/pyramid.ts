@@ -101,3 +101,25 @@ export function seedPyramid(entries: SeedEntry[]): Map<string, Position> {
   });
   return result;
 }
+
+/**
+ * 1-based rank at which a member joining an already-running season is
+ * inserted, by ITN (lower = stronger). `existing` is the current pyramid in
+ * rank order. The newcomer goes directly below the lowest-ranked existing
+ * member whose ITN is at least as good as theirs — conservative on purpose:
+ * a strong player who has since dropped down the pyramid pulls the newcomer
+ * down with them rather than letting them jump over people who beat that
+ * player. Existing members without an ITN are ignored for the comparison.
+ * No better-or-equal ITN in the pyramid → top; no ITN at all → bottom.
+ */
+export function insertionRankByItn(
+  existing: { itn: number | null }[],
+  itn: number | null,
+): number {
+  if (itn === null) return existing.length + 1;
+  for (let i = existing.length - 1; i >= 0; i--) {
+    const other = existing[i].itn;
+    if (other !== null && other <= itn) return i + 2;
+  }
+  return 1;
+}

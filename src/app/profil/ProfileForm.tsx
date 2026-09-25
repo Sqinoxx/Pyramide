@@ -3,13 +3,12 @@
 import { useActionState } from "react";
 import { updateProfileAction } from "./actions";
 import { initialActionState } from "@/lib/form-state";
-import { Field, CheckboxField, FormError, FormSuccess, SubmitButton } from "@/components/form";
+import { Field, FormError, FormSuccess, SubmitButton } from "@/components/form";
 
 export function ProfileForm(props: {
   club: string | null;
   phone: string | null;
   preferredTimes: string | null;
-  showItnPublicly: boolean;
 }) {
   const [state, formAction, pending] = useActionState(updateProfileAction, initialActionState);
 
@@ -32,11 +31,6 @@ export function ProfileForm(props: {
           className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         />
       </div>
-      <CheckboxField
-        label="ITN öffentlich in der Pyramide anzeigen"
-        name="showItnPublicly"
-        defaultChecked={props.showItnPublicly}
-      />
       <div>
         <SubmitButton>{pending ? "Wird gespeichert…" : "Speichern"}</SubmitButton>
       </div>

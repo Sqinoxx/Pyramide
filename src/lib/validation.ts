@@ -97,7 +97,6 @@ export const profileSchema = z.object({
   club: z.string().trim().max(150).optional().or(z.literal("")),
   phone: z.string().trim().max(40).optional().or(z.literal("")),
   preferredTimes: z.string().trim().max(500).optional().or(z.literal("")),
-  showItnPublicly: z.boolean(),
 });
 
 /** Urlaubs-/Verletzungsmodus (PLAN.md §4.5): a member can't be challenged, and can't challenge, until this date. */

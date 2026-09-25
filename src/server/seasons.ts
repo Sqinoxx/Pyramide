@@ -31,9 +31,8 @@ export class SeasonAlreadyActiveError extends Error {
 /**
  * Starts a fresh season for a division and seeds every currently active
  * member into it by ITN (PLAN.md §5.3): sorted ascending (1.0 = strongest),
- * unrated members last in join order. One-shot — there's no season here to
- * seed *into* later, later joiners are appended at the bottom via
- * approveMember() in src/server/members.ts instead.
+ * unrated members last in join order. One-shot — later joiners are
+ * inserted by ITN via approveMember() in src/server/members.ts instead.
  */
 export async function startSeason(divisionId: string, name: string) {
   const existing = await getActiveSeason(divisionId);
@@ -125,31 +124,27 @@ export type PyramidRow = {
   memberId: string;
   firstName: string;
   lastName: string;
-  showItnPublicly: boolean;
-  itn: Awaited<ReturnType<typeof getActiveItnForMember>>;
 };
 
 export async function getPyramidView(divisionId: string) {
   const season = await getActiveSeason(divisionId);
   if (!season) return null;
 
-  const rows = await db
+  // ITN is deliberately not part of this view: it's only used internally for
+  // placement (startSeason() above, approveMember() in ./members.ts) and is
+  // never shown in the public pyramid.
+  const rows: PyramidRow[] = await db
     .select({
       row: positions.row,
       slot: positions.slot,
       memberId: members.id,
       firstName: members.firstName,
       lastName: members.lastName,
-      showItnPublicly: members.showItnPublicly,
     })
     .from(positions)
     .innerJoin(members, eq(positions.memberId, members.id))
     .where(eq(positions.seasonId, season.id))
     .orderBy(asc(positions.row), asc(positions.slot));
 
-  const withItn: PyramidRow[] = await Promise.all(
-    rows.map(async (r) => ({ ...r, itn: await getActiveItnForMember(r.memberId) })),
-  );
-
-  return { season, rows: withItn };
+  return { season, rows };
 }

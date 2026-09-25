@@ -16,8 +16,12 @@ export default function RulesPage() {
             Herren und Damen spielen in getrennten Pyramiden. Zu Saisonbeginn
             werden alle freigeschalteten Mitglieder nach ihrer offiziellen
             OÖTV-ITN aufsteigend einsortiert (niedrigerer Wert = stärker);
-            ohne ITN startet man unten. Wer später dazukommt, startet
-            grundsätzlich am Ende der Pyramide.
+            ohne ITN startet man unten. Wer später dazukommt, wird ebenfalls
+            gleich anhand der ITN eingeordnet — direkt hinter dem
+            letztplatzierten Spieler mit gleicher oder besserer ITN; alle
+            dahinter rücken um einen Platz nach hinten. Ohne ITN startet man
+            am Ende der Pyramide. Die ITN dient nur der Einordnung und wird
+            in der Pyramide nicht angezeigt.
           </p>
         </section>
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   divisions,
@@ -13,7 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { resolveActiveItn, type ActiveItn } from "@/lib/itn-precedence";
-import { nextOpenPosition } from "@/lib/pyramid";
+import { insertionRankByItn, positionOfRank, rankOf } from "@/lib/pyramid";
 import { sendMemberApprovedEmail } from "./mailer";
 
 export async function getDivisionForGender(gender: "m" | "w") {
@@ -43,11 +43,10 @@ export async function listPendingMembers() {
 
 /**
  * Admin approval: flips the member active and — if the division currently
- * has an active season — appends them at the bottom of the pyramid (PLAN.md
- * §5.3, "später Beitretende starten unten"). Recorded with reason "admin"
- * since there's no dedicated position_reason value for a plain mid-season
- * join; the audit trail on the challenge/season side never needs to
- * distinguish the two.
+ * has an active season — inserts them into the pyramid by ITN right away
+ * (see insertionRankByItn() in src/lib/pyramid.ts; no ITN → bottom).
+ * Everyone from that rank down moves one rank lower. All moves, including
+ * the newcomer's own placement, are recorded with reason "insert".
  */
 export async function approveMember(memberId: string) {
   const updated = await db.transaction(async (tx) => {
@@ -67,27 +66,72 @@ export async function approveMember(memberId: string) {
       });
 
       if (season) {
-        const [{ count }] = await tx
-          .select({ count: sql<number>`count(*)::int` })
+        // Locked in rank order so a concurrent swap/insert can't reshuffle
+        // the pyramid between computing the insertion rank and shifting.
+        const current = await tx
+          .select()
           .from(positions)
-          .where(eq(positions.seasonId, season.id));
+          .where(eq(positions.seasonId, season.id))
+          .orderBy(asc(positions.row), asc(positions.slot))
+          .for("update");
 
-        const pos = nextOpenPosition(count);
+        const itnOf = async (id: string) => (await getActiveItnForMember(id))?.value ?? null;
+        const [ownItn, existingItns] = await Promise.all([
+          itnOf(memberId),
+          Promise.all(current.map(async (p) => ({ itn: await itnOf(p.memberId) }))),
+        ]);
+        // insertionRankByItn() works on list indices; map back to a real
+        // rank so a gap in the pyramid can't misplace the newcomer.
+        const idx = insertionRankByItn(existingItns, ownItn) - 1;
+        const rank =
+          idx < current.length
+            ? rankOf(current[idx])
+            : current.length > 0
+              ? rankOf(current[current.length - 1]) + 1
+              : 1;
+
+        // Shift everyone at or below `rank` down by one, bottom-up so each
+        // target slot is already free (UNIQUE(season, row, slot) isn't
+        // deferrable).
+        const displaced = current.filter((p) => rankOf(p) >= rank).reverse();
+        for (const p of displaced) {
+          const to = positionOfRank(rankOf(p) + 1);
+          await tx
+            .update(positions)
+            .set({ row: to.row, slot: to.slot, since: new Date() })
+            .where(eq(positions.id, p.id));
+        }
+
+        const pos = positionOfRank(rank);
         await tx.insert(positions).values({
           seasonId: season.id,
           memberId,
           row: pos.row,
           slot: pos.slot,
         });
-        await tx.insert(positionHistory).values({
-          seasonId: season.id,
-          memberId,
-          fromRow: null,
-          fromSlot: null,
-          toRow: pos.row,
-          toSlot: pos.slot,
-          reason: "admin",
-        });
+        await tx.insert(positionHistory).values([
+          {
+            seasonId: season.id,
+            memberId,
+            fromRow: null,
+            fromSlot: null,
+            toRow: pos.row,
+            toSlot: pos.slot,
+            reason: "insert" as const,
+          },
+          ...displaced.map((p) => {
+            const to = positionOfRank(rankOf(p) + 1);
+            return {
+              seasonId: season.id,
+              memberId: p.memberId,
+              fromRow: p.row,
+              fromSlot: p.slot,
+              toRow: to.row,
+              toSlot: to.slot,
+              reason: "insert" as const,
+            };
+          }),
+        ]);
       }
     }
 
@@ -157,7 +201,7 @@ export async function setSelfItn(memberId: string, userId: string, value: number
 
 export async function updateMemberProfile(
   memberId: string,
-  data: { club?: string | null; phone?: string | null; preferredTimes?: string | null; showItnPublicly: boolean },
+  data: { club?: string | null; phone?: string | null; preferredTimes?: string | null },
 ) {
   await db
     .update(members)
@@ -165,7 +209,6 @@ export async function updateMemberProfile(
       club: data.club || null,
       phone: data.phone || null,
       preferredTimes: data.preferredTimes || null,
-      showItnPublicly: data.showItnPublicly,
     })
     .where(eq(members.id, memberId));
 }

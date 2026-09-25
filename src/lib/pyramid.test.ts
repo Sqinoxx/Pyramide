@@ -8,6 +8,7 @@ import {
   isEligibleChallenge,
   swapPositions,
   seedPyramid,
+  insertionRankByItn,
 } from "./pyramid";
 
 describe("slotsUpToRow", () => {
@@ -130,5 +131,33 @@ describe("seedPyramid", () => {
     const result = seedPyramid(entries);
     const ranks = [...result.values()].map(rankOf).sort((a, b) => a - b);
     expect(ranks).toEqual(Array.from({ length: 17 }, (_, i) => i + 1));
+  });
+});
+
+describe("insertionRankByItn", () => {
+  const pyramid = (...itns: (number | null)[]) => itns.map((itn) => ({ itn }));
+
+  it("appends members without ITN at the bottom", () => {
+    expect(insertionRankByItn(pyramid(3.0, 5.0), null)).toBe(3);
+  });
+
+  it("places the new member directly below the last one with a better-or-equal ITN", () => {
+    expect(insertionRankByItn(pyramid(2.0, 4.0, 6.0), 5.0)).toBe(3);
+    expect(insertionRankByItn(pyramid(2.0, 4.0, 6.0), 4.0)).toBe(3);
+  });
+
+  it("goes to the top when nobody in the pyramid has a better ITN", () => {
+    expect(insertionRankByItn(pyramid(3.0, 5.0), 1.5)).toBe(1);
+    expect(insertionRankByItn(pyramid(null, null), 5.0)).toBe(1);
+  });
+
+  it("ignores unrated members and respects the current (post-challenge) order", () => {
+    // A 2.0 player who has dropped to rank 3 pulls a 4.0 newcomer below them.
+    expect(insertionRankByItn(pyramid(5.0, null, 2.0, 7.0), 4.0)).toBe(4);
+  });
+
+  it("handles an empty pyramid", () => {
+    expect(insertionRankByItn([], 4.0)).toBe(1);
+    expect(insertionRankByItn([], null)).toBe(1);
   });
 });

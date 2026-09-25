@@ -119,6 +119,10 @@ export default async function ProfilePage() {
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           ITN
         </h2>
+        <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+          Nur für dich sichtbar — wird ausschließlich für die Einordnung in
+          die Pyramide verwendet.
+        </p>
         <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
           {activeItn ? formatItnBadge(activeItn) : "Noch keine ITN hinterlegt."}
           {activeItn?.mismatchWithSelf && (
@@ -138,7 +142,6 @@ export default async function ProfilePage() {
           club={member.club}
           phone={member.phone}
           preferredTimes={member.preferredTimes}
-          showItnPublicly={member.showItnPublicly}
         />
       </section>
 

@@ -32,7 +32,6 @@ export async function updateProfileAction(
     club: formData.get("club"),
     phone: formData.get("phone"),
     preferredTimes: formData.get("preferredTimes"),
-    showItnPublicly: formData.get("showItnPublicly") === "on",
   };
   const parsed = profileSchema.safeParse(raw);
   if (!parsed.success) {
