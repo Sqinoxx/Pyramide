@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   divisions,
@@ -340,13 +340,30 @@ export async function listMembersForAdmin(filter: AdminMemberFilter = {}) {
     .where(eq(seasons.status, "active"));
   const positionByMember = new Map(placed.map((p) => [p.memberId, p]));
 
-  return Promise.all(
-    filtered.map(async (m) => ({
-      ...m,
-      position: positionByMember.get(m.id) ?? null,
-      itn: await getActiveItnForMember(m.id),
-    })),
-  );
+  // One query for all ITN rows instead of one per member.
+  const ids = filtered.map((m) => m.id);
+  const itnRows = ids.length
+    ? await db.query.memberItn.findMany({ where: inArray(memberItn.memberId, ids) })
+    : [];
+  const itnByMember = new Map<string, typeof itnRows>();
+  for (const row of itnRows) {
+    const list = itnByMember.get(row.memberId) ?? [];
+    list.push(row);
+    itnByMember.set(row.memberId, list);
+  }
+
+  return filtered.map((m) => ({
+    ...m,
+    position: positionByMember.get(m.id) ?? null,
+    itn: resolveActiveItn(
+      (itnByMember.get(m.id) ?? []).map((e) => ({
+        source: e.source,
+        value: Number(e.value),
+        asOf: e.asOf,
+        supersededAt: e.supersededAt,
+      })),
+    ),
+  }));
 }
 
 export async function countMembersByStatus() {

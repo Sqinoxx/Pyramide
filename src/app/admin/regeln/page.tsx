@@ -12,11 +12,12 @@ export default async function RuleSettingsPage() {
     divisions.map(async (d) => ({ division: d, view: await getPyramidView(d.id) })),
   );
   // The rule is configured per division (/admin/einstellungen).
+  // Without a running season, show the default the next season will get.
   const ruleActive = views.map(({ division, view }) => ({
     division,
-    settings: view ? divisionSettingsSchema.parse(view.season.settings ?? {}) : null,
+    settings: divisionSettingsSchema.parse((view ? view.season.settings : division.settings) ?? {}),
   }));
-  const anyEnabled = ruleActive.some((r) => (r.settings?.minMatchesPerYear ?? 0) > 0);
+  const anyEnabled = ruleActive.some((r) => r.settings.minMatchesPerYear > 0);
   const flagged = views.flatMap(({ division, view }) =>
     view
       ? view.rows
@@ -48,7 +49,7 @@ export default async function RuleSettingsPage() {
         {ruleActive.map(({ division, settings }) => (
           <li key={division.id} className="badge badge-neutral">
             {division.name}:{" "}
-            {settings && settings.minMatchesPerYear > 0
+            {settings.minMatchesPerYear > 0
               ? `${settings.minMatchesPerYear} Spiele, Sanduhr ${settings.minMatchesWarningDays} Tage vorher`
               : "aus"}
           </li>

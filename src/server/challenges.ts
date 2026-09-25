@@ -238,17 +238,35 @@ export async function createChallenge(seasonId: string, challengerId: string, de
   }
 
   try {
-    const [challenge] = await db
-      .insert(challenges)
-      .values({
-        seasonId,
-        challengerId,
-        defenderId,
-        state: "proposed",
-        proposedAt: now,
-        acceptDeadline: addDays(now, settings.acceptDeadlineDays),
-      })
-      .returning();
+    const challenge = await db.transaction(async (tx) => {
+      // Re-check under a share lock on the season row: pausing the pyramid
+      // or ending the season both UPDATE that row, so they either finish
+      // before this read (and we reject) or wait until the insert commits.
+      const [season] = await tx
+        .select({ status: seasons.status, settings: seasons.settings })
+        .from(seasons)
+        .where(eq(seasons.id, seasonId))
+        .for("share");
+      if (!season || season.status !== "active") {
+        throw new ChallengeError("Diese Saison ist nicht mehr aktiv.");
+      }
+      if (divisionSettingsSchema.parse(season.settings ?? {}).challengesPaused) {
+        throw new ChallengeError("Forderungen sind derzeit pausiert.");
+      }
+
+      const [inserted] = await tx
+        .insert(challenges)
+        .values({
+          seasonId,
+          challengerId,
+          defenderId,
+          state: "proposed",
+          proposedAt: now,
+          acceptDeadline: addDays(now, settings.acceptDeadlineDays),
+        })
+        .returning();
+      return inserted;
+    });
 
     const challenger = await db.query.members.findFirst({ where: eq(members.id, challengerId) });
     if (challenger) {
