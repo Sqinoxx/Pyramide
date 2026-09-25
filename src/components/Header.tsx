@@ -18,6 +18,7 @@ const ADMIN_LINKS = [
   { href: "/admin/itn-import", label: "ITN-Import" },
   { href: "/admin/itn", label: "ITN-Zuordnung" },
   { href: "/admin/saison", label: "Saison" },
+  { href: "/admin/regeln", label: "Fristen & Mindestspiele" },
   { href: "/admin/forderungen", label: "Streitfälle" },
   { href: "/admin/audit", label: "Audit-Log" },
   { href: "/admin/ankuendigungen", label: "Ankündigungen" },

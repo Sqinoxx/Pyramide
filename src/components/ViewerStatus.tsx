@@ -3,6 +3,8 @@ import type { ChallengeBlockReason } from "@/server/challenges";
 import type { Position } from "@/lib/pyramid";
 import { rankOf } from "@/lib/pyramid";
 import { createChallengeAction } from "@/app/forderungen/actions";
+import type { MatchQuotaStatus } from "@/lib/match-quota";
+import { HourglassIcon } from "./icons";
 
 const DIVISION_LABEL: Record<string, string> = {
   herren: "Herren",
@@ -32,6 +34,7 @@ export function ViewerStatus({
   blockedBy,
   onLeaveUntil,
   eligible,
+  quota,
 }: {
   firstName: string;
   lastName: string;
@@ -42,6 +45,7 @@ export function ViewerStatus({
   blockedBy?: ChallengeBlockReason | null;
   onLeaveUntil?: Date | null;
   eligible?: EligibleDefender[];
+  quota?: MatchQuotaStatus;
 }) {
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 
@@ -67,6 +71,27 @@ export function ViewerStatus({
           </p>
         </div>
       </div>
+
+      {quota && (
+        <div className={`alert mt-4 flex gap-2 ${quota.state === "overdue" ? "alert-error" : "alert-warning"}`}>
+          <HourglassIcon className="h-5 w-5 shrink-0" />
+          <p>
+            {quota.state === "overdue" ? (
+              <>
+                Du hast bis {quota.deadline.toLocaleDateString("de-AT")} nur {quota.played} von{" "}
+                {quota.required} Pflichtspielen bestritten. Ein Admin kann dich aus der Pyramide
+                entfernen.
+              </>
+            ) : (
+              <>
+                Dir fehlen noch {quota.required - quota.played} Spiel(e) bis{" "}
+                {quota.deadline.toLocaleDateString("de-AT")} ({quota.played}/{quota.required}).
+                Sonst kannst du aus der Pyramide entfernt werden.
+              </>
+            )}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 border-t border-line pt-3">
         {otherDivisionKey ? (
