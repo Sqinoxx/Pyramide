@@ -35,6 +35,15 @@ in den Verlauf verschieben).
 
 ## Erledigt
 
+- [x] Admin-Seite `/admin/regeln` („Fristen & Mindestspiele“): Fristen
+      (Annahme/Austragung/Bestätigung), Sperrfristen und Inaktivität für alle
+      Bewerbe anpassbar (sofort für die laufende Saison, Vorgabe für neue).
+      Neue Regel „Mindestspiele pro Jahr“ (`minMatchesPerYear`, 0 = aus;
+      Jahr ab Eintritt in die Pyramide): Sanduhr in der Pyramide ab
+      `minMatchesWarningDays` (Standard 30) vor Fristende, rot nach Ablauf
+      bis der Admin die Person manuell entfernt (Lücke wird geschlossen,
+      offene Forderungen storniert). Regelseite zeigt jetzt die echten Werte.
+
 - [x] Phasen 0–6 (Scaffold, Auth/Profil, ITN-Import, Pyramide, Forderungen,
       Cronjobs, Statistik/Feed/Audit) — siehe Git-Historie
 - [x] Phase 7 (teilweise): Rechtsseiten, Regelseite, HTML-Injection-Fix

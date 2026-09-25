@@ -84,6 +84,7 @@ export default async function Home({
             blockedBy={view ? (overview?.blockedBy ?? null) : "not_placed"}
             onLeaveUntil={overview?.onLeaveUntil ?? null}
             eligible={overview?.eligible}
+            quota={view?.rows.find((r) => r.memberId === viewerMemberId)?.quota}
           />
         </div>
       )}

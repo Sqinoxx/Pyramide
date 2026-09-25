@@ -1,8 +1,10 @@
-import { DEFAULT_DIVISION_SETTINGS } from "@/lib/settings";
+import { connection } from "next/server";
+import { getRuleSettings } from "@/server/seasons";
 
-const s = DEFAULT_DIVISION_SETTINGS;
-
-export default function RulesPage() {
+export default async function RulesPage() {
+  // Settings are admin-editable now, so this can't be prerendered at build time.
+  await connection();
+  const s = await getRuleSettings();
   return (
     <div className="page max-w-2xl">
       <h1 className="page-title mb-6">
@@ -66,6 +68,20 @@ export default function RulesPage() {
             unten. Der Urlaubs-/Verletzungsmodus im Profil pausiert das.
           </p>
         </section>
+
+        {s.minMatchesPerYear > 0 && (
+          <section className="card card-body">
+            <h2>Mindestspiele</h2>
+            <p>
+              Pro Jahr (gezählt ab dem Eintritt in die Pyramide) müssen
+              mindestens {s.minMatchesPerYear} Spiele bestritten werden.
+              {" "}{s.minMatchesWarningDays} Tage vor Fristende erscheint bei
+              wem noch Spiele fehlen eine Sanduhr; wird die Anzahl nicht
+              erreicht, bleibt sie sichtbar und ein Admin kann die Person aus
+              der Pyramide entfernen.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );
