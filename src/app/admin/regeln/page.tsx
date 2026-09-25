@@ -1,15 +1,23 @@
-import { getAllDivisions, getPyramidView, getRuleSettings } from "@/server/seasons";
+import Link from "next/link";
+import { getAllDivisions, getPyramidView } from "@/server/seasons";
+import { divisionSettingsSchema } from "@/lib/settings";
 import { rankOf } from "@/lib/pyramid";
 import { HourglassIcon } from "@/components/icons";
 import { EmptyState } from "@/components/ui";
-import { RuleSettingsForm } from "./RuleSettingsForm";
 import { removeFromPyramidAction } from "./actions";
 
 export default async function RuleSettingsPage() {
-  const [settings, divisions] = await Promise.all([getRuleSettings(), getAllDivisions()]);
+  const divisions = await getAllDivisions();
   const views = await Promise.all(
     divisions.map(async (d) => ({ division: d, view: await getPyramidView(d.id) })),
   );
+  // The rule is configured per division (/admin/einstellungen).
+  // Without a running season, show the default the next season will get.
+  const ruleActive = views.map(({ division, view }) => ({
+    division,
+    settings: divisionSettingsSchema.parse((view ? view.season.settings : division.settings) ?? {}),
+  }));
+  const anyEnabled = ruleActive.some((r) => r.settings.minMatchesPerYear > 0);
   const flagged = views.flatMap(({ division, view }) =>
     view
       ? view.rows
@@ -27,24 +35,28 @@ export default async function RuleSettingsPage() {
 
   return (
     <div className="page max-w-2xl">
-      <h1 className="page-title">Fristen & Mindestspiele</h1>
-      <p className="page-lead mb-6">
-        Gilt für alle Bewerbe: sofort für die laufende Saison und als Vorgabe für neue
-        Saisonen. Bereits laufende Forderungen behalten ihre ursprünglichen Fristen.
+      <h1 className="page-title">Mindestspiele</h1>
+      <p className="page-lead mb-4">
+        Das Jahr zählt ab dem Eintritt in die Pyramide. Die Sanduhr erscheint kurz vor
+        Fristende und bleibt danach sichtbar, bis du die Person manuell entfernst. Rot =
+        Frist abgelaufen. Anzahl und Vorwarnzeit stellst du je Bewerb unter{" "}
+        <Link href="/admin/einstellungen" className="link">
+          Regeln &amp; Einstellungen
+        </Link>{" "}
+        ein.
       </p>
+      <ul className="mb-6 flex flex-wrap gap-1.5">
+        {ruleActive.map(({ division, settings }) => (
+          <li key={division.id} className="badge badge-neutral">
+            {division.name}:{" "}
+            {settings.minMatchesPerYear > 0
+              ? `${settings.minMatchesPerYear} Spiele, Sanduhr ${settings.minMatchesWarningDays} Tage vorher`
+              : "aus"}
+          </li>
+        ))}
+      </ul>
 
-      <RuleSettingsForm settings={settings} />
-
-      <h2 className="mt-10 mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Mindestspiele – Sanduhr
-      </h2>
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-        Das Jahr zählt ab dem Eintritt in die Pyramide. Die Sanduhr erscheint{" "}
-        {settings.minMatchesWarningDays} Tage vor Fristende und bleibt danach sichtbar, bis du
-        die Person manuell entfernst. Rot = Frist abgelaufen.
-      </p>
-
-      {settings.minMatchesPerYear <= 0 ? (
+      {!anyEnabled ? (
         <EmptyState>Die Mindestspiele-Regel ist deaktiviert.</EmptyState>
       ) : flagged.length === 0 ? (
         <EmptyState>Aktuell ist niemand betroffen.</EmptyState>

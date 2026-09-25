@@ -163,6 +163,8 @@ function BlockedMessage({
       return <>Du bist in der aktuellen Pyramide noch nicht platziert.</>;
     case "inactive":
       return <>Dein Konto ist noch nicht aktiv – daher kannst du noch niemanden fordern.</>;
+    case "paused":
+      return <>Forderungen sind derzeit pausiert (z. B. Winterpause).</>;
     case "on_leave":
       return (
         <>

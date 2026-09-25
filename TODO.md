@@ -43,6 +43,16 @@ in den Verlauf verschieben).
       `minMatchesWarningDays` (Standard 30) vor Fristende, rot nach Ablauf
       bis der Admin die Person manuell entfernt (Lücke wird geschlossen,
       offene Forderungen storniert). Regelseite zeigt jetzt die echten Werte.
+- [x] Admin-Panel ausgebaut: Übersicht (`/admin`) mit Kennzahlen und
+      Bereichskacheln; Regel-Einstellungen je Bewerb (`/admin/einstellungen`:
+      Fristen, Reichweite, Sperrfristen, Forderungs-Pause, Inaktivitätsregel
+      inkl. Nachfrist, Zähler-Reset); Spieler:innen-Liste mit Filter und
+      stellvertretendem Urlaubsmodus (`/admin/spieler`); Saison beenden und
+      umbenennen, frühere Saisonen; Regelseite zeigt die echten Werte je
+      Bewerb; Audit-Log-Beschriftungen zentralisiert. Beim Merge mit
+      `/admin/regeln` zusammengeführt: dessen vereinsweites Formular ist in
+      die Einstellungen je Bewerb aufgegangen (inkl. Mindestspiele),
+      `/admin/regeln` zeigt nur noch die Mindestspiele-Liste zum Entfernen
 
 - [x] Phasen 0–6 (Scaffold, Auth/Profil, ITN-Import, Pyramide, Forderungen,
       Cronjobs, Statistik/Feed/Audit) — siehe Git-Historie

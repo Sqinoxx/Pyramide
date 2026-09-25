@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { startSeason, SeasonAlreadyActiveError, adminSwapPositions } from "@/server/seasons";
+import {
+  startSeason,
+  SeasonAlreadyActiveError,
+  adminSwapPositions,
+  endSeason,
+  renameSeason,
+} from "@/server/seasons";
 import { recordAudit } from "@/server/audit";
 import type { ActionState } from "@/lib/form-state";
 
@@ -52,6 +58,35 @@ export async function adminSwapPositionsAction(formData: FormData): Promise<void
     memberAId,
     memberBId,
   });
+  revalidatePath("/admin/saison");
+  revalidatePath("/");
+}
+
+export async function endSeasonAction(formData: FormData): Promise<void> {
+  const adminId = await requireAdmin();
+  const seasonId = String(formData.get("seasonId") ?? "");
+  // The confirmation checkbox is `required` in the form; re-checked here so
+  // a stray request can't close a season by accident.
+  if (!seasonId || formData.get("confirm") !== "on") return;
+
+  const result = await endSeason(seasonId);
+  if (!result) return;
+  await recordAudit(adminId, "end_season", "season", seasonId, null, {
+    cancelledChallenges: result.cancelledChallenges,
+  });
+  revalidatePath("/admin/saison");
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
+export async function renameSeasonAction(formData: FormData): Promise<void> {
+  const adminId = await requireAdmin();
+  const seasonId = String(formData.get("seasonId") ?? "");
+  const name = String(formData.get("name") ?? "").trim().slice(0, 100);
+  if (!seasonId || !name) return;
+
+  await renameSeason(seasonId, name);
+  await recordAudit(adminId, "rename_season", "season", seasonId, null, { name });
   revalidatePath("/admin/saison");
   revalidatePath("/");
 }

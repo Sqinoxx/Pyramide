@@ -1,0 +1,23 @@
+/** Human-readable labels for audit_log.action values (see recordAudit callers). */
+export const ACTION_LABEL: Record<string, string> = {
+  approve_member: "Mitglied freigeschaltet",
+  confirm_itn_match: "ITN-Treffer bestätigt",
+  dismiss_itn_match: "ITN-Treffer abgelehnt",
+  set_admin_itn: "ITN manuell gesetzt",
+  import_itn: "ITN-Liste importiert",
+  start_season: "Saison gestartet",
+  resolve_dispute: "Streitfall entschieden",
+  admin_move_position: "Position manuell geändert",
+  end_season: "Saison beendet",
+  rename_season: "Saison umbenannt",
+  update_settings: "Regeln geändert",
+  reset_settings: "Regeln zurückgesetzt",
+  reset_inactivity: "Inaktivitätszähler zurückgesetzt",
+  admin_set_leave: "Urlaubsmodus gesetzt",
+  admin_clear_leave: "Urlaubsmodus beendet",
+  create_announcement: "Ankündigung erstellt",
+  delete_announcement: "Ankündigung gelöscht",
+  update_rule_settings: "Regeln geändert",
+  remove_from_pyramid: "Aus Pyramide entfernt",
+  import_club_members: "Vereinsmitglieder importiert",
+};

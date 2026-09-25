@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   divisions,
@@ -303,4 +303,75 @@ export async function listActiveMembers(query?: string) {
       m.lastName.toLowerCase().includes(q) ||
       m.club?.toLowerCase().includes(q),
   );
+}
+
+export type AdminMemberFilter = {
+  query?: string;
+  divisionKey?: "herren" | "damen";
+  status?: "pending" | "active" | "paused" | "left";
+};
+
+/**
+ * Admin member list: everyone (incl. pending/left), with e-mail, current
+ * pyramid position in the division's active season and the active ITN.
+ */
+export async function listMembersForAdmin(filter: AdminMemberFilter = {}) {
+  const q = filter.query?.trim().toLowerCase();
+  const rows = await db.query.members.findMany({
+    where: filter.status ? eq(members.status, filter.status) : undefined,
+    orderBy: (m, { asc }) => [asc(m.lastName), asc(m.firstName)],
+    with: { division: true, user: true },
+  });
+
+  const filtered = rows.filter(
+    (m) =>
+      (!filter.divisionKey || m.division?.key === filter.divisionKey) &&
+      (!q ||
+        m.firstName.toLowerCase().includes(q) ||
+        m.lastName.toLowerCase().includes(q) ||
+        m.user.email.toLowerCase().includes(q) ||
+        !!m.club?.toLowerCase().includes(q)),
+  );
+
+  const placed = await db
+    .select({ memberId: positions.memberId, row: positions.row, slot: positions.slot })
+    .from(positions)
+    .innerJoin(seasons, eq(positions.seasonId, seasons.id))
+    .where(eq(seasons.status, "active"));
+  const positionByMember = new Map(placed.map((p) => [p.memberId, p]));
+
+  // One query for all ITN rows instead of one per member.
+  const ids = filtered.map((m) => m.id);
+  const itnRows = ids.length
+    ? await db.query.memberItn.findMany({ where: inArray(memberItn.memberId, ids) })
+    : [];
+  const itnByMember = new Map<string, typeof itnRows>();
+  for (const row of itnRows) {
+    const list = itnByMember.get(row.memberId) ?? [];
+    list.push(row);
+    itnByMember.set(row.memberId, list);
+  }
+
+  return filtered.map((m) => ({
+    ...m,
+    position: positionByMember.get(m.id) ?? null,
+    itn: resolveActiveItn(
+      (itnByMember.get(m.id) ?? []).map((e) => ({
+        source: e.source,
+        value: Number(e.value),
+        asOf: e.asOf,
+        supersededAt: e.supersededAt,
+      })),
+    ),
+  }));
+}
+
+export async function countMembersByStatus() {
+  const rows = await db
+    .select({ status: members.status, count: sql<number>`count(*)::int` })
+    .from(members)
+    .groupBy(members.status);
+  return Object.fromEntries(rows.map((r) => [r.status, r.count])) as Partial<
+    Record<"pending" | "active" | "paused" | "left", number>
+  >;
 }
