@@ -3,6 +3,7 @@ import { auth, signOut } from "@/auth";
 import { getMemberByUserId } from "@/server/members";
 import { countUnreadNotifications } from "@/server/notifications";
 import { DropdownMenu, MobileMenu, NavLink } from "./nav";
+import { ADMIN_SECTIONS } from "@/lib/admin-nav";
 import { BallLogo, BellIcon, BookIcon, LogoutIcon, ShieldIcon } from "./icons";
 
 const MEMBER_LINKS = [
@@ -12,16 +13,7 @@ const MEMBER_LINKS = [
   { href: "/mitglieder", label: "Mitglieder" },
 ];
 
-const ADMIN_LINKS = [
-  { href: "/admin/mitglieder", label: "Registrierungen" },
-  { href: "/admin/mitglieder-import", label: "Vereinsmitglieder" },
-  { href: "/admin/itn-import", label: "ITN-Import" },
-  { href: "/admin/itn", label: "ITN-Zuordnung" },
-  { href: "/admin/saison", label: "Saison" },
-  { href: "/admin/forderungen", label: "Streitfälle" },
-  { href: "/admin/audit", label: "Audit-Log" },
-  { href: "/admin/ankuendigungen", label: "Ankündigungen" },
-];
+const ADMIN_LINKS = [{ href: "/admin", label: "Übersicht" }, ...ADMIN_SECTIONS];
 
 const desktopLink =
   "rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-muted";

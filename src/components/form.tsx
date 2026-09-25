@@ -77,16 +77,17 @@ export function SelectField(props: {
 export function CheckboxField(props: {
   label: string;
   name: string;
+  id?: string;
   defaultChecked?: boolean;
 }) {
-  const { label, name, defaultChecked } = props;
+  const { label, name, id = name, defaultChecked } = props;
   return (
     <label
-      htmlFor={name}
+      htmlFor={id}
       className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300"
     >
       <input
-        id={name}
+        id={id}
         name={name}
         type="checkbox"
         defaultChecked={defaultChecked}

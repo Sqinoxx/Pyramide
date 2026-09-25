@@ -16,7 +16,8 @@ import {
 } from "./icons";
 
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
+  // Section roots whose sub-pages have their own nav entries.
+  if (href === "/" || href === "/admin") return pathname === href;
   return pathname === href || pathname.startsWith(href + "/");
 }
 

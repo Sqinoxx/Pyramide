@@ -35,6 +35,14 @@ in den Verlauf verschieben).
 
 ## Erledigt
 
+- [x] Admin-Panel ausgebaut: Übersicht (`/admin`) mit Kennzahlen und
+      Bereichskacheln; Regel-Einstellungen je Bewerb (`/admin/einstellungen`:
+      Fristen, Reichweite, Sperrfristen, Forderungs-Pause, Inaktivitätsregel
+      inkl. Nachfrist, Zähler-Reset); Spieler:innen-Liste mit Filter und
+      stellvertretendem Urlaubsmodus (`/admin/spieler`); Saison beenden und
+      umbenennen, frühere Saisonen; Regelseite zeigt die echten Werte je
+      Bewerb; Audit-Log-Beschriftungen zentralisiert
+
 - [x] Phasen 0–6 (Scaffold, Auth/Profil, ITN-Import, Pyramide, Forderungen,
       Cronjobs, Statistik/Feed/Audit) — siehe Git-Historie
 - [x] Phase 7 (teilweise): Rechtsseiten, Regelseite, HTML-Injection-Fix

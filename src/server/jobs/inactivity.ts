@@ -9,8 +9,6 @@ import { swapMemberPositions } from "@/server/position-swap";
 import { maxDate } from "@/lib/dates";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
-/** Grace period after the warning before an actual demotion (PLAN.md §8.5: "Warnung, danach Abstieg" — the plan doesn't pin down how much later, so one extra week). */
-const GRACE_WEEKS_AFTER_WARNING = 1;
 
 /**
  * `positionSince` (positions.since, always set — defaultNow() at insert) is
@@ -91,6 +89,7 @@ async function checkSeason(seasonId: string) {
   const season = await db.query.seasons.findFirst({ where: eq(seasons.id, seasonId) });
   if (!season) return;
   const settings = divisionSettingsSchema.parse(season.settings ?? {});
+  if (!settings.inactivityEnabled || settings.challengesPaused) return;
 
   const rows = await db
     .select({ position: positions, member: members })
@@ -103,12 +102,17 @@ async function checkSeason(seasonId: string) {
   for (const { position, member } of rows) {
     if (member.onLeaveUntil && member.onLeaveUntil > now) continue;
 
-    const lastActivity = await getLastActivityDate(seasonId, member.id, position.since);
+    // inactivityCountFrom: set when a pause ends, so the pause itself never
+    // counts as inactivity (see updateDivisionSettings).
+    const lastActivity = maxDate(
+      await getLastActivityDate(seasonId, member.id, position.since),
+      settings.inactivityCountFrom,
+    );
     const weeksInactive = (now.getTime() - lastActivity.getTime()) / MS_PER_WEEK;
 
     if (weeksInactive < settings.inactivityWeeks) continue;
 
-    if (weeksInactive >= settings.inactivityWeeks + GRACE_WEEKS_AFTER_WARNING) {
+    if (weeksInactive >= settings.inactivityWeeks + settings.inactivityGraceWeeks) {
       await demoteForInactivity(seasonId, member.id);
     } else if (!(await hasRecentWarning(member.id, lastActivity))) {
       await notifyInactivityWarning(member.id, Math.floor(weeksInactive));

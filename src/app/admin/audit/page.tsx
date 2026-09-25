@@ -1,16 +1,7 @@
 import { listAuditLog } from "@/server/audit";
 import { EmptyState } from "@/components/ui";
+import { ACTION_LABEL } from "@/lib/audit-labels";
 
-const ACTION_LABEL: Record<string, string> = {
-  approve_member: "Mitglied freigeschaltet",
-  confirm_itn_match: "ITN-Treffer bestätigt",
-  dismiss_itn_match: "ITN-Treffer abgelehnt",
-  set_admin_itn: "ITN manuell gesetzt",
-  import_itn: "ITN-Liste importiert",
-  start_season: "Saison gestartet",
-  resolve_dispute: "Streitfall entschieden",
-  admin_move_position: "Position manuell geändert",
-};
 
 export default async function AuditLogPage() {
   const entries = await listAuditLog(200);

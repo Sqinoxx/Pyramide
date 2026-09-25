@@ -17,9 +17,120 @@ export const divisionSettingsSchema = z.object({
   postMatchCooldownDays: z.number().int().min(0).max(30).default(3),
   inactivityWeeks: z.number().int().min(1).max(52).default(8),
   declineForfeit: z.boolean().default(true),
+  // Winterpause etc.: no new challenges and the inactivity clock stands
+  // still. Challenges that are already open keep running normally.
+  challengesPaused: z.boolean().default(false),
+  inactivityEnabled: z.boolean().default(true),
+  inactivityGraceWeeks: z.number().int().min(0).max(12).default(1),
+  // Not admin-editable: stamped when a pause ends (or the admin resets the
+  // counter) so the inactivity job never counts time before it.
+  inactivityCountFrom: z.coerce.date().nullable().default(null),
 });
 
 export type DivisionSettings = z.infer<typeof divisionSettingsSchema>;
 
 export const DEFAULT_DIVISION_SETTINGS: DivisionSettings =
   divisionSettingsSchema.parse({});
+
+type NumericKey = {
+  [K in keyof DivisionSettings]: DivisionSettings[K] extends number ? K : never;
+}[keyof DivisionSettings];
+type BooleanKey = {
+  [K in keyof DivisionSettings]: DivisionSettings[K] extends boolean ? K : never;
+}[keyof DivisionSettings];
+
+/**
+ * Admin-editable subset of the settings, with labels for the settings form
+ * (src/app/admin/einstellungen). maxOpenOutgoing/-Incoming are deliberately
+ * missing: the partial unique indexes in drizzle/0001 pin them to 1.
+ */
+export const NUMERIC_SETTING_FIELDS: {
+  key: NumericKey;
+  group: "fordern" | "fristen" | "inaktivitaet";
+  label: string;
+  unit: string;
+  help?: string;
+}[] = [
+  {
+    key: "challengeRowRange",
+    group: "fordern",
+    label: "Forderungsreichweite",
+    unit: "Reihen",
+    help: "Wie viele Reihen nach oben gefordert werden darf.",
+  },
+  {
+    key: "rematchCooldownDays",
+    group: "fordern",
+    label: "Sperrfrist gleiche Paarung",
+    unit: "Tage",
+    help: "Bis dieselben zwei Personen erneut gegeneinander antreten dürfen.",
+  },
+  {
+    key: "postMatchCooldownDays",
+    group: "fordern",
+    label: "Sperrfrist nach einem Match",
+    unit: "Tage",
+    help: "Schonfrist, in der man nach einem Match nicht gefordert werden kann.",
+  },
+  { key: "acceptDeadlineDays", group: "fristen", label: "Frist zur Annahme", unit: "Tage" },
+  { key: "playDeadlineDays", group: "fristen", label: "Frist zur Austragung", unit: "Tage" },
+  {
+    key: "reportConfirmDays",
+    group: "fristen",
+    label: "Frist zur Ergebnisbestätigung",
+    unit: "Tage",
+    help: "Danach gilt ein gemeldetes Ergebnis automatisch als bestätigt.",
+  },
+  {
+    key: "inactivityWeeks",
+    group: "inaktivitaet",
+    label: "Inaktiv nach",
+    unit: "Wochen",
+    help: "Ohne Match in dieser Zeit gibt es eine Verwarnung.",
+  },
+  {
+    key: "inactivityGraceWeeks",
+    group: "inaktivitaet",
+    label: "Nachfrist nach Verwarnung",
+    unit: "Wochen",
+    help: "Danach rutscht man eine Position nach unten.",
+  },
+];
+
+export const BOOLEAN_SETTING_FIELDS: {
+  key: BooleanKey;
+  group: "fordern" | "fristen" | "inaktivitaet";
+  label: string;
+  help?: string;
+}[] = [
+  {
+    key: "challengesPaused",
+    group: "fordern",
+    label: "Forderungen pausieren",
+    help: "Z. B. Winterpause: keine neuen Forderungen, Inaktivität wird nicht gezählt.",
+  },
+  {
+    key: "challengeSameRow",
+    group: "fordern",
+    label: "Forderung innerhalb der eigenen Reihe erlauben",
+  },
+  {
+    key: "declineForfeit",
+    group: "fordern",
+    label: "Absage wertet als Niederlage",
+    help: "Wer eine Forderung ablehnt, verliert kampflos (Walkover).",
+  },
+  {
+    key: "inactivityEnabled",
+    group: "inaktivitaet",
+    label: "Inaktivitätsregel aktiv",
+  },
+];
+
+/** Bounds straight from the zod schema, so the form can't drift from it. */
+export function numericSettingBounds(key: NumericKey): { min: number; max: number } {
+  const field = divisionSettingsSchema.shape[key];
+  // .default() wraps the ZodNumber; unwrap to read its checks.
+  const inner = field.unwrap() as z.ZodNumber;
+  return { min: inner.minValue ?? 0, max: inner.maxValue ?? 999 };
+}

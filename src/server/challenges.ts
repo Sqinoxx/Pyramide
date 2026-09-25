@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
+import { and, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { challenges, matches, matchSets, members, positions, seasons } from "@/db/schema";
 import { isEligibleChallenge, type Position } from "@/lib/pyramid";
@@ -72,6 +72,7 @@ async function getPosition(seasonId: string, memberId: string): Promise<Position
  */
 export async function getEligibleDefenders(seasonId: string, challengerId: string) {
   const settings = await getSeasonSettings(seasonId);
+  if (settings.challengesPaused) return [];
   const challengerPos = await getPosition(seasonId, challengerId);
   if (!challengerPos) return [];
 
@@ -108,7 +109,12 @@ export async function getEligibleDefenders(seasonId: string, challengerId: strin
   return eligible;
 }
 
-export type ChallengeBlockReason = "not_placed" | "inactive" | "on_leave" | "open_challenge";
+export type ChallengeBlockReason =
+  | "not_placed"
+  | "inactive"
+  | "paused"
+  | "on_leave"
+  | "open_challenge";
 
 /**
  * The logged-in member's view of the pyramid: where they stand and whom they
@@ -119,11 +125,13 @@ export type ChallengeBlockReason = "not_placed" | "inactive" | "on_leave" | "ope
 export async function getViewerChallengeOverview(seasonId: string, memberId: string) {
   const position = await getPosition(seasonId, memberId);
   const member = await db.query.members.findFirst({ where: eq(members.id, memberId) });
+  const settings = await getSeasonSettings(seasonId);
 
   let blockedBy: ChallengeBlockReason | null = null;
   let onLeaveUntil: Date | null = null;
   if (!position) blockedBy = "not_placed";
   else if (member?.status !== "active") blockedBy = "inactive";
+  else if (settings.challengesPaused) blockedBy = "paused";
   else if (member.onLeaveUntil && member.onLeaveUntil > new Date()) {
     blockedBy = "on_leave";
     onLeaveUntil = member.onLeaveUntil;
@@ -195,6 +203,9 @@ export async function createChallenge(seasonId: string, challengerId: string, de
   if (challengerId === defenderId) throw new ChallengeError("Man kann sich nicht selbst fordern.");
 
   const settings = await getSeasonSettings(seasonId);
+  if (settings.challengesPaused) {
+    throw new ChallengeError("Forderungen sind derzeit pausiert.");
+  }
   const [challengerPos, defenderPos] = await Promise.all([
     getPosition(seasonId, challengerId),
     getPosition(seasonId, defenderId),
@@ -659,4 +670,12 @@ export async function listChallengesNeedingAdminAttention() {
       season: { with: { division: true } },
     },
   });
+}
+
+export async function countOpenChallenges(seasonId: string) {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(challenges)
+    .where(and(eq(challenges.seasonId, seasonId), inArray(challenges.state, OPEN_STATES)));
+  return rows[0]?.count ?? 0;
 }

@@ -1,10 +1,10 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { seasons, positions, positionHistory, members, divisions } from "@/db/schema";
+import { seasons, positions, positionHistory, members, divisions, challenges } from "@/db/schema";
 import { seedPyramid, type SeedEntry } from "@/lib/pyramid";
 import { getActiveItnForMember } from "./members";
-import { DEFAULT_DIVISION_SETTINGS } from "@/lib/settings";
+import { divisionSettingsSchema, type DivisionSettings } from "@/lib/settings";
 import { swapMemberPositions } from "./position-swap";
 
 export async function getAllDivisions() {
@@ -19,6 +19,63 @@ export async function getActiveSeason(divisionId: string) {
   return db.query.seasons.findFirst({
     where: and(eq(seasons.divisionId, divisionId), eq(seasons.status, "active")),
   });
+}
+
+/**
+ * The rules a division's *next* season starts with. Stored on the division
+ * so they survive between seasons; the active season carries its own copy
+ * (seasons.settings) which is what the challenge engine actually reads.
+ */
+export async function getDivisionSettings(divisionId: string): Promise<DivisionSettings> {
+  const division = await db.query.divisions.findFirst({ where: eq(divisions.id, divisionId) });
+  return divisionSettingsSchema.parse(division?.settings ?? {});
+}
+
+/**
+ * Admin rule change. Always updates the division default; with
+ * `applyToActiveSeason` it also rewrites the running season's copy, which
+ * takes effect immediately (deadlines of already-open challenges were
+ * computed when they were created and stay as they are).
+ */
+export async function updateDivisionSettings(
+  divisionId: string,
+  settings: DivisionSettings,
+  applyToActiveSeason: boolean,
+) {
+  const next = divisionSettingsSchema.parse(settings);
+  return db.transaction(async (tx) => {
+    await tx.update(divisions).set({ settings: next }).where(eq(divisions.id, divisionId));
+    if (!applyToActiveSeason) return null;
+
+    const season = await tx.query.seasons.findFirst({
+      where: and(eq(seasons.divisionId, divisionId), eq(seasons.status, "active")),
+    });
+    if (!season) return null;
+
+    const prev = divisionSettingsSchema.parse(season.settings ?? {});
+    const resumed = prev.challengesPaused && !next.challengesPaused;
+    await tx
+      .update(seasons)
+      .set({
+        settings: {
+          ...next,
+          inactivityCountFrom: resumed ? new Date() : prev.inactivityCountFrom,
+        },
+      })
+      .where(eq(seasons.id, season.id));
+    return season.id;
+  });
+}
+
+/** "Alle starten bei null": nobody is inactive before now. */
+export async function resetInactivityCounter(seasonId: string) {
+  const season = await db.query.seasons.findFirst({ where: eq(seasons.id, seasonId) });
+  if (!season) return;
+  const current = divisionSettingsSchema.parse(season.settings ?? {});
+  await db
+    .update(seasons)
+    .set({ settings: { ...current, inactivityCountFrom: new Date() } })
+    .where(eq(seasons.id, seasonId));
 }
 
 export class SeasonAlreadyActiveError extends Error {
@@ -38,6 +95,7 @@ export class SeasonAlreadyActiveError extends Error {
 export async function startSeason(divisionId: string, name: string) {
   const existing = await getActiveSeason(divisionId);
   if (existing) throw new SeasonAlreadyActiveError();
+  const settings = await getDivisionSettings(divisionId);
 
   const divisionMembers = await db.query.members.findMany({
     where: and(eq(members.divisionId, divisionId), eq(members.status, "active")),
@@ -59,7 +117,7 @@ export async function startSeason(divisionId: string, name: string) {
         name,
         startsAt: new Date(),
         status: "active",
-        settings: DEFAULT_DIVISION_SETTINGS,
+        settings,
       })
       .returning();
 
@@ -88,6 +146,58 @@ export async function startSeason(divisionId: string, name: string) {
     }
 
     return season;
+  });
+}
+
+// Everything that isn't final yet — see OPEN_STATES in ./challenges.ts.
+const UNRESOLVED_CHALLENGE_STATES = [
+  "proposed",
+  "accepted",
+  "reported",
+  "disputed",
+  "expired_accept",
+  "expired_play",
+] as const;
+
+/**
+ * Closes the active season so a new one can be started. Challenges still in
+ * flight are cancelled without any position change — a season end is a
+ * hard cut, results nobody confirmed in time simply don't count.
+ */
+export async function endSeason(seasonId: string) {
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    const [season] = await tx
+      .update(seasons)
+      .set({ status: "closed", endsAt: now })
+      .where(and(eq(seasons.id, seasonId), eq(seasons.status, "active")))
+      .returning();
+    if (!season) return null;
+
+    const cancelled = await tx
+      .update(challenges)
+      .set({ state: "cancelled", resolution: "cancelled", resolvedAt: now })
+      .where(
+        and(
+          eq(challenges.seasonId, seasonId),
+          inArray(challenges.state, [...UNRESOLVED_CHALLENGE_STATES]),
+        ),
+      )
+      .returning({ id: challenges.id });
+
+    return { season, cancelledChallenges: cancelled.length };
+  });
+}
+
+export async function renameSeason(seasonId: string, name: string) {
+  await db.update(seasons).set({ name }).where(eq(seasons.id, seasonId));
+}
+
+export async function listClosedSeasons(divisionId: string) {
+  return db.query.seasons.findMany({
+    where: and(eq(seasons.divisionId, divisionId), eq(seasons.status, "closed")),
+    orderBy: (s, { desc }) => [desc(s.startsAt)],
+    limit: 5,
   });
 }
 
