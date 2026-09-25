@@ -1,3 +1,4 @@
+import { AuthCard } from "@/components/ui";
 import { confirmMagicLoginAction } from "./actions";
 
 /**
@@ -13,34 +14,26 @@ export default async function ConfirmMagicLoginPage({
   const { email, token } = await searchParams;
 
   if (!email || !token) {
-    return (
-      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Ungültiger Link
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Dieser Anmelde-Link ist unvollständig.
-        </p>
-      </div>
-    );
+    return <AuthCard center title="Ungültiger Link" lead="Dieser Anmelde-Link ist unvollständig." />;
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16 text-center">
-      <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Anmelden</h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        Bestätige die Anmeldung für <strong>{email}</strong>.
-      </p>
+    <AuthCard
+      center
+      title="Anmelden"
+      lead={
+        <>
+          Bestätige die Anmeldung für <strong className="break-all">{email}</strong>.
+        </>
+      }
+    >
       <form action={confirmMagicLoginAction}>
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="token" value={token} />
-        <button
-          type="submit"
-          className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
+        <button type="submit" className="btn btn-primary w-full">
           Jetzt anmelden
         </button>
       </form>
-    </div>
+    </AuthCard>
   );
 }

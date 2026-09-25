@@ -10,14 +10,14 @@ export function LeaveForm({ onLeaveUntil }: { onLeaveUntil: string | null }) {
 
   if (onLeaveUntil) {
     return (
-      <div className="flex items-center gap-3 text-sm">
-        <p className="text-zinc-700 dark:text-zinc-300">
+      <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center">
+        <p className="flex-1 text-zinc-700 dark:text-zinc-300">
           Du bist im Urlaubsmodus bis{" "}
           <strong>{new Date(onLeaveUntil).toLocaleDateString("de-AT")}</strong> — in dieser Zeit
           kannst du weder fordern noch gefordert werden.
         </p>
         <form action={clearLeaveAction}>
-          <button type="submit" className="underline">
+          <button type="submit" className="btn btn-secondary w-full sm:w-auto">
             Beenden
           </button>
         </form>
@@ -26,20 +26,21 @@ export function LeaveForm({ onLeaveUntil }: { onLeaveUntil: string | null }) {
   }
 
   return (
-    <form action={formAction} className="flex items-end gap-3">
+    <form action={formAction} className="flex flex-col gap-3">
       <FormError message={state.fieldErrors?.until} />
-      <div className="flex flex-col gap-1">
-        <label htmlFor="until" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Urlaubs-/Verletzungsmodus bis
-        </label>
-        <input
-          id="until"
-          name="until"
-          type="date"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
+      <p className="hint">
+        In dieser Zeit kannst du weder fordern noch gefordert werden, und die
+        Inaktivitätsregel pausiert.
+      </p>
+      <div className="flex items-end gap-2 sm:gap-3">
+        <div className="flex flex-1 flex-col gap-1.5 sm:flex-none">
+          <label htmlFor="until" className="label">
+            Urlaubs-/Verletzungsmodus bis
+          </label>
+          <input id="until" name="until" type="date" className="input sm:w-48" />
+        </div>
+        <SubmitButton>{pending ? "…" : "Aktivieren"}</SubmitButton>
       </div>
-      <SubmitButton>{pending ? "…" : "Aktivieren"}</SubmitButton>
     </form>
   );
 }

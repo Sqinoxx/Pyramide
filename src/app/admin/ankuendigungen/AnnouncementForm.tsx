@@ -16,32 +16,32 @@ export function AnnouncementForm({
     <form action={formAction} className="flex flex-col gap-3">
       <FormError message={state.error} />
       <FormSuccess message={state.success ? "Veröffentlicht." : undefined} />
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Titel</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="label">Titel</label>
         <input
           name="title"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         />
         {state.fieldErrors?.title && (
-          <p className="text-sm text-red-600 dark:text-red-400">{state.fieldErrors.title}</p>
+          <p className="field-error">{state.fieldErrors.title}</p>
         )}
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Text</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="label">Text</label>
         <textarea
           name="bodyMd"
           rows={4}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         />
         {state.fieldErrors?.bodyMd && (
-          <p className="text-sm text-red-600 dark:text-red-400">{state.fieldErrors.bodyMd}</p>
+          <p className="field-error">{state.fieldErrors.bodyMd}</p>
         )}
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Bewerb</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="label">Bewerb</label>
         <select
           name="divisionId"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         >
           <option value="">Vereinsweit</option>
           {divisions.map((d) => (

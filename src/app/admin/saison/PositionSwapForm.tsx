@@ -8,13 +8,13 @@ export function PositionSwapForm({
   members: { memberId: string; firstName: string; lastName: string; row: number; slot: number }[];
 }) {
   return (
-    <form action={adminSwapPositionsAction} className="mt-3 flex flex-wrap items-end gap-2">
+    <form action={adminSwapPositionsAction} className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
       <input type="hidden" name="seasonId" value={seasonId} />
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-zinc-500 dark:text-zinc-400">Mitglied A</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="label">Mitglied A</label>
         <select
           name="memberAId"
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         >
           {members.map((m) => (
             <option key={m.memberId} value={m.memberId}>
@@ -23,11 +23,11 @@ export function PositionSwapForm({
           ))}
         </select>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-zinc-500 dark:text-zinc-400">Mitglied B</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="label">Mitglied B</label>
         <select
           name="memberBId"
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         >
           {members.map((m) => (
             <option key={m.memberId} value={m.memberId}>
@@ -38,7 +38,7 @@ export function PositionSwapForm({
       </div>
       <button
         type="submit"
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+        className="btn btn-secondary w-full sm:w-auto"
       >
         Positionen tauschen
       </button>

@@ -1,5 +1,6 @@
 import { listChallengesNeedingAdminAttention } from "@/server/challenges";
 import { resolveDisputeAction } from "./actions";
+import { EmptyState } from "@/components/ui";
 
 const STATE_LABEL: Record<string, string> = {
   disputed: "Ergebnis strittig",
@@ -10,22 +11,22 @@ export default async function DisputedChallengesPage() {
   const items = await listChallengesNeedingAdminAttention();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="page max-w-2xl">
+      <h1 className="page-title">
         Strittige Forderungen
       </h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="page-lead mb-6">
         Entscheide, wer gewonnen hat — die Position wird entsprechend
         angepasst, sofern die fordernde Person gewinnt. Ohne Sieger wird die
         Forderung ohne Positionsänderung storniert.
       </p>
 
       {items.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Keine offenen Fälle.</p>
+        <EmptyState>Keine offenen Fälle.</EmptyState>
       ) : (
         <ul className="flex flex-col gap-4">
           {items.map((c) => (
-            <li key={c.id} className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
+            <li key={c.id} className="card card-body">
               <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-50">
                 {c.challenger.firstName} {c.challenger.lastName} vs. {c.defender.firstName}{" "}
                 {c.defender.lastName}
@@ -49,13 +50,13 @@ export default async function DisputedChallengesPage() {
                   </>
                 )}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <form action={resolveDisputeAction}>
                   <input type="hidden" name="challengeId" value={c.id} />
                   <input type="hidden" name="winnerId" value={c.challengerId} />
                   <button
                     type="submit"
-                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    className="btn btn-primary w-full sm:w-auto"
                   >
                     {c.challenger.firstName} hat gewonnen
                   </button>
@@ -65,7 +66,7 @@ export default async function DisputedChallengesPage() {
                   <input type="hidden" name="winnerId" value={c.defenderId} />
                   <button
                     type="submit"
-                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    className="btn btn-primary w-full sm:w-auto"
                   >
                     {c.defender.firstName} hat gewonnen
                   </button>
@@ -74,7 +75,7 @@ export default async function DisputedChallengesPage() {
                   <input type="hidden" name="challengeId" value={c.id} />
                   <button
                     type="submit"
-                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+                    className="btn btn-secondary w-full sm:w-auto"
                   >
                     Stornieren (kein Sieger)
                   </button>

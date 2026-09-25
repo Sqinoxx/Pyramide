@@ -8,7 +8,7 @@ export function AdminItnForm({ memberId }: { memberId: string }) {
   const [state, formAction, pending] = useActionState(setAdminItnAction, initialActionState);
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="memberId" value={memberId} />
       <input
         name="value"
@@ -17,18 +17,20 @@ export function AdminItnForm({ memberId }: { memberId: string }) {
         min="1.0"
         max="10.3"
         placeholder="ITN"
-        className="w-20 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        inputMode="decimal"
+        aria-label="ITN manuell"
+        className="input w-24 sm:w-24"
       />
       <button
         type="submit"
-        className="rounded-md border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="btn btn-secondary"
       >
         {pending ? "…" : "Manuell setzen"}
       </button>
       {state.fieldErrors?.value && (
-        <span className="text-xs text-red-600 dark:text-red-400">{state.fieldErrors.value}</span>
+        <span className="field-error">{state.fieldErrors.value}</span>
       )}
-      {state.success && <span className="text-xs text-green-600 dark:text-green-400">Gesetzt.</span>}
+      {state.success && <span className="text-sm text-brand-700 dark:text-brand-300">Gesetzt.</span>}
     </form>
   );
 }

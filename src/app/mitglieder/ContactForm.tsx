@@ -14,9 +14,10 @@ export function ContactForm({ toMemberId }: { toMemberId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700"
+        aria-label="Nachricht senden"
+        className="btn btn-secondary btn-sm"
       >
-        Nachricht senden
+        Nachricht<span className="hidden sm:inline"> senden</span>
       </button>
     );
   }
@@ -26,27 +27,21 @@ export function ContactForm({ toMemberId }: { toMemberId: string }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <form action={formAction} className="flex w-full flex-col gap-2 sm:w-64">
       <input type="hidden" name="toMemberId" value={toMemberId} />
       <FormError message={state.error} />
       <textarea
         name="message"
-        rows={2}
+        rows={3}
+        autoFocus
         placeholder="Nachricht (z. B. Terminvorschlag)"
-        className="w-56 rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+        className="input"
       />
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-        >
+      <div className="grid grid-cols-2 gap-2">
+        <button type="submit" className="btn btn-primary btn-sm">
           {pending ? "…" : "Senden"}
         </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700"
-        >
+        <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary btn-sm">
           Abbrechen
         </button>
       </div>

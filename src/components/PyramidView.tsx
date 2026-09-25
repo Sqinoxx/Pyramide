@@ -2,6 +2,7 @@ import type { PyramidRow } from "@/server/seasons";
 import { formatItnBadge } from "@/lib/itn-precedence";
 import { rankOf } from "@/lib/pyramid";
 import { createChallengeAction } from "@/app/forderungen/actions";
+import { EmptyState } from "./ui";
 
 function groupByRow(rows: PyramidRow[]): PyramidRow[][] {
   const maxRow = rows.reduce((max, r) => Math.max(max, r.row), 0);
@@ -24,58 +25,79 @@ export function PyramidView({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Diese Pyramide wurde noch nicht gestartet.
-      </p>
+      <EmptyState>Diese Pyramide wurde noch nicht gestartet.</EmptyState>
     );
   }
 
   const byRow = groupByRow(rows);
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex min-w-max flex-col items-center gap-2 px-4">
+    // Phones get the pyramid as stacked, labelled rows in a grid (a real
+    // triangle would need ~8 cards side by side); from md up it's the
+    // classic centred pyramid, scrolling sideways only if a row is too wide.
+    <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6">
+      <div className="flex flex-col gap-6 md:mx-auto md:w-max md:items-center md:gap-3">
         {byRow.map((row, i) => (
-          <div key={i} className="flex gap-2">
-            {row.map((entry) => {
-              const isSelf = entry.memberId === viewerMemberId;
-              const canChallenge = !isSelf && eligibleMemberIds?.has(entry.memberId);
-              return (
-                <div
-                  key={entry.memberId}
-                  className={
-                    "flex w-36 flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-center shadow-sm " +
-                    (isSelf
-                      ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
-                      : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900")
-                  }
-                >
-                  <span className="text-[11px] font-semibold tabular-nums text-zinc-400 dark:text-zinc-500">
-                    {rankOf({ row: entry.row, slot: entry.slot })}
-                  </span>
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {entry.firstName} {entry.lastName}
-                  </span>
-                  {entry.itn && entry.showItnPublicly && (
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {formatItnBadge(entry.itn)}
+          <div key={i} className="w-full md:w-auto">
+            <h3 className="mb-2 flex items-center gap-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase md:hidden dark:text-zinc-400">
+              Reihe {i + 1}
+              <span className="h-px flex-1 bg-line" />
+            </h3>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:flex md:justify-center md:gap-3">
+              {row.map((entry) => {
+                const isSelf = entry.memberId === viewerMemberId;
+                const canChallenge = !isSelf && eligibleMemberIds?.has(entry.memberId);
+                const rank = rankOf({ row: entry.row, slot: entry.slot });
+                return (
+                  <div
+                    key={entry.memberId}
+                    className={
+                      "relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border px-2.5 pt-3 pb-3 text-center shadow-sm transition-shadow md:w-36 lg:w-40 " +
+                      (isSelf
+                        ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/20 dark:border-brand-400 dark:bg-brand-950"
+                        : canChallenge
+                          ? "border-brand-200 bg-surface hover:shadow-md dark:border-brand-900"
+                          : "border-line bg-surface")
+                    }
+                  >
+                    <span
+                      className={
+                        "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums " +
+                        (rank === 1
+                          ? "bg-ball text-zinc-900"
+                          : isSelf
+                            ? "bg-brand-600 text-white"
+                            : "bg-surface-muted text-zinc-500 dark:text-zinc-400")
+                      }
+                    >
+                      {rank}
                     </span>
-                  )}
-                  {canChallenge && seasonId && (
-                    <form action={createChallengeAction}>
-                      <input type="hidden" name="seasonId" value={seasonId} />
-                      <input type="hidden" name="defenderId" value={entry.memberId} />
-                      <button
-                        type="submit"
-                        className="mt-1 rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      >
-                        Fordern
-                      </button>
-                    </form>
-                  )}
-                </div>
-              );
-            })}
+                    {isSelf && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold tracking-wide text-brand-700 uppercase dark:text-brand-300">
+                        Du
+                      </span>
+                    )}
+                    <span className="w-full text-sm leading-snug font-medium break-words text-zinc-900 dark:text-zinc-50">
+                      {entry.firstName} {entry.lastName}
+                    </span>
+                    {entry.itn && entry.showItnPublicly && (
+                      <span className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                        {formatItnBadge(entry.itn)}
+                      </span>
+                    )}
+                    {canChallenge && seasonId && (
+                      <form action={createChallengeAction} className="mt-auto w-full pt-1">
+                        <input type="hidden" name="seasonId" value={seasonId} />
+                        <input type="hidden" name="defenderId" value={entry.memberId} />
+                        <button type="submit" className="btn btn-primary btn-sm w-full">
+                          Fordern
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { getMemberByUserId } from "@/server/members";
 import { listNotificationsForMember } from "@/server/notifications";
 import { markAllReadAction, markReadAction } from "./actions";
+import { EmptyState, Notice, PageHeader } from "@/components/ui";
 
 type Payload = Record<string, unknown>;
 
@@ -64,56 +65,66 @@ export default async function NotificationsPage() {
   const session = await auth();
   const member = await getMemberByUserId(session!.user.id);
   if (!member) {
-    return (
-      <div className="mx-auto max-w-lg px-6 py-16 text-center text-zinc-600 dark:text-zinc-400">
-        Kein Mitgliedsprofil gefunden.
-      </div>
-    );
+    return <Notice>Kein Mitgliedsprofil gefunden.</Notice>;
   }
 
   const items = await listNotificationsForMember(member.id);
 
   return (
-    <div className="mx-auto w-full max-w-xl px-6 py-16">
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Benachrichtigungen
-        </h1>
-        {items.some((n) => !n.readAt) && (
-          <form action={markAllReadAction}>
-            <button type="submit" className="text-sm underline text-zinc-600 dark:text-zinc-400">
-              Alle als gelesen markieren
-            </button>
-          </form>
-        )}
-      </div>
+    <div className="page max-w-2xl">
+      <PageHeader
+        title="Benachrichtigungen"
+        actions={
+          items.some((n) => !n.readAt) && (
+            <form action={markAllReadAction}>
+              <button type="submit" className="btn btn-secondary btn-sm">
+                Alle als gelesen markieren
+              </button>
+            </form>
+          )
+        }
+      />
 
       {items.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Keine Benachrichtigungen.</p>
+        <EmptyState>Keine Benachrichtigungen.</EmptyState>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="card divide-y divide-line overflow-hidden">
           {items.map((n) => {
             const { text, href } = formatNotification(n.type, n.payload as Payload);
+            const unread = !n.readAt;
             return (
               <li
                 key={n.id}
                 className={
-                  "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm " +
-                  (n.readAt
-                    ? "border-zinc-200 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
-                    : "border-zinc-900 bg-zinc-50 text-zinc-900 dark:border-zinc-100 dark:bg-zinc-900 dark:text-zinc-50")
+                  "flex items-start gap-3 px-4 py-3 text-sm " +
+                  (unread ? "bg-brand-50/60 dark:bg-brand-950/40" : "")
                 }
               >
-                <a href={href} className="flex-1 hover:underline">
-                  {text}
-                  <span className="ml-2 text-xs text-zinc-400">
+                <span
+                  aria-hidden="true"
+                  className={
+                    "mt-1.5 h-2 w-2 shrink-0 rounded-full " + (unread ? "bg-brand-500" : "bg-line")
+                  }
+                />
+                <a href={href} className="min-w-0 flex-1">
+                  <span
+                    className={
+                      "block break-words " +
+                      (unread
+                        ? "font-medium text-zinc-900 dark:text-zinc-50"
+                        : "text-zinc-600 dark:text-zinc-400")
+                    }
+                  >
+                    {text}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-zinc-400 dark:text-zinc-500">
                     {new Date(n.createdAt).toLocaleString("de-AT")}
                   </span>
                 </a>
-                {!n.readAt && (
-                  <form action={markReadAction}>
+                {unread && (
+                  <form action={markReadAction} className="shrink-0">
                     <input type="hidden" name="notificationId" value={n.id} />
-                    <button type="submit" className="text-xs underline">
+                    <button type="submit" className="btn btn-ghost btn-sm -my-1">
                       gelesen
                     </button>
                   </form>
