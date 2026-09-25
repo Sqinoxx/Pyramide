@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
 import { getMemberByUserId } from "@/server/members";
@@ -6,6 +7,8 @@ import { getEligibleDefenders } from "@/server/challenges";
 import { listPublishedAnnouncements } from "@/server/announcements";
 import { PyramidView } from "@/components/PyramidView";
 import { DivisionTabs, EmptyState, PageHeader } from "@/components/ui";
+import { PyramidLayoutToggle } from "@/components/PyramidLayoutToggle";
+import { PYRAMID_LAYOUT_COOKIE, parsePyramidLayout } from "@/lib/pyramid-layout";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
   herren: "Herren",
@@ -19,6 +22,8 @@ export default async function Home({
 }) {
   const { bewerb } = await searchParams;
   const active: "herren" | "damen" = bewerb === "damen" ? "damen" : "herren";
+
+  const layout = parsePyramidLayout((await cookies()).get(PYRAMID_LAYOUT_COOKIE)?.value);
 
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
@@ -47,8 +52,9 @@ export default async function Home({
         lead={view ? view.season.name : undefined}
       />
 
-      <div className="mb-6 flex justify-center sm:mb-8">
+      <div className="mb-6 flex items-center justify-center gap-2 sm:mb-8">
         <DivisionTabs active={active} basePath="/" />
+        {view && view.rows.length > 0 && <PyramidLayoutToggle layout={layout} bewerb={active} />}
       </div>
 
       {announcements.length > 0 && (
@@ -86,6 +92,7 @@ export default async function Home({
 
       {view ? (
         <PyramidView
+          layout={layout}
           rows={view.rows}
           seasonId={view.season.id}
           viewerMemberId={viewerMemberId}

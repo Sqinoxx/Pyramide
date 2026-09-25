@@ -31,6 +31,17 @@ export function PyramidIcon(props: IconProps) {
   );
 }
 
+export function ListIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="14" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="14" width="7" height="7" rx="1.5" />
+    </Svg>
+  );
+}
+
 export function TrophyIcon(props: IconProps) {
   return (
     <Svg {...props}>

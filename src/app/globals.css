@@ -160,7 +160,8 @@ body {
   .segmented-item {
     @apply inline-flex min-h-9 min-w-24 items-center justify-center rounded-lg px-4 text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100;
   }
-  .segmented-item[aria-current="page"] {
+  .segmented-item[aria-current="page"],
+  .segmented-item[aria-pressed="true"] {
     @apply bg-brand-700 text-white shadow-sm hover:text-white dark:bg-brand-500 dark:text-brand-950;
   }
 
