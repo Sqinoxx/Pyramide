@@ -3,12 +3,13 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
 import { getMemberByUserId } from "@/server/members";
-import { getEligibleDefenders } from "@/server/challenges";
+import { getViewerChallengeOverview } from "@/server/challenges";
 import { listPublishedAnnouncements } from "@/server/announcements";
 import { PyramidView } from "@/components/PyramidView";
 import { DivisionTabs, EmptyState, PageHeader } from "@/components/ui";
 import { PyramidLayoutToggle } from "@/components/PyramidLayoutToggle";
 import { PYRAMID_LAYOUT_COOKIE, parsePyramidLayout } from "@/lib/pyramid-layout";
+import { ViewerStatus } from "@/components/ViewerStatus";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
   herren: "Herren",
@@ -27,21 +28,24 @@ export default async function Home({
 
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
-  const announcements = division ? await listPublishedAnnouncements(division.id, 3) : [];
+  const announcements = division
+    ? await listPublishedAnnouncements(division.id, 3)
+    : [];
 
   const session = await auth();
+  const member = session?.user
+    ? await getMemberByUserId(session.user.id)
+    : undefined;
+  const playsHere = !!member && !!division && member.divisionId === division.id;
+
   let viewerMemberId: string | undefined;
   let eligibleMemberIds: Set<string> | undefined;
-  if (session?.user && view) {
-    const member = await getMemberByUserId(session.user.id);
-    if (member && member.divisionId === division!.id) {
-      viewerMemberId = member.id;
-      const eligible = await getEligibleDefenders(view.season.id, member.id);
-      eligibleMemberIds = new Set(eligible.map((e) => e.memberId));
-    }
+  let overview: Awaited<ReturnType<typeof getViewerChallengeOverview>> | undefined;
+  if (member && playsHere && view) {
+    viewerMemberId = member.id;
+    overview = await getViewerChallengeOverview(view.season.id, member.id);
+    eligibleMemberIds = new Set(overview.eligible.map((e) => e.memberId));
   }
-
-  const canChallengeCount = eligibleMemberIds?.size ?? 0;
 
   return (
     <div className="page max-w-6xl">
@@ -68,26 +72,20 @@ export default async function Home({
         </div>
       )}
 
-      {viewerMemberId && view && view.rows.length > 0 && (
-        <p className="mx-auto mb-6 max-w-2xl text-center text-sm text-zinc-600 dark:text-zinc-400">
-          {canChallengeCount > 0 ? (
-            <>
-              Du kannst aktuell{" "}
-              <strong className="text-brand-700 dark:text-brand-300">
-                {canChallengeCount} {canChallengeCount === 1 ? "Person" : "Personen"}
-              </strong>{" "}
-              fordern.
-            </>
-          ) : (
-            <>
-              Gerade ist keine Forderung möglich —{" "}
-              <Link href="/forderungen" className="link">
-                offene Forderungen ansehen
-              </Link>
-              .
-            </>
-          )}
-        </p>
+      {member && (
+        <div className="mx-auto mb-6 max-w-2xl sm:mb-8">
+          <ViewerStatus
+            firstName={member.firstName}
+            lastName={member.lastName}
+            divisionKey={member.division?.key ?? null}
+            otherDivisionKey={member.division && !playsHere ? member.division.key : undefined}
+            seasonId={view?.season.id}
+            position={overview?.position ?? null}
+            blockedBy={view ? (overview?.blockedBy ?? null) : "not_placed"}
+            onLeaveUntil={overview?.onLeaveUntil ?? null}
+            eligible={overview?.eligible}
+          />
+        </div>
       )}
 
       {view ? (

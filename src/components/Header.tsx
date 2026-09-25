@@ -50,13 +50,33 @@ async function signOutAction() {
   await signOut({ redirectTo: "/" });
 }
 
+function Avatar({ initials, className = "" }: { initials: string; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[10px] font-semibold text-white dark:bg-brand-500 dark:text-brand-950 ${className}`}
+    >
+      {initials}
+    </span>
+  );
+}
+
 export async function Header() {
   const session = await auth();
 
   let unreadCount = 0;
+  let displayName: string | undefined;
+  let initials = "";
   if (session?.user) {
     const member = await getMemberByUserId(session.user.id);
-    if (member) unreadCount = await countUnreadNotifications(member.id);
+    if (member) {
+      unreadCount = await countUnreadNotifications(member.id);
+      displayName = `${member.firstName} ${member.lastName}`;
+      initials = `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`.toUpperCase();
+    } else {
+      displayName = session.user.email;
+      initials = session.user.email.charAt(0).toUpperCase();
+    }
   }
 
   const isAdmin = session?.user?.role === "admin";
@@ -119,11 +139,14 @@ export async function Header() {
               </NavLink>
               <NavLink
                 href="/profil"
-                className={desktopLink}
+                title="Angemeldet – zum Profil"
+                className={`${desktopLink} flex items-center gap-2`}
                 activeClassName={desktopActive}
                 inactiveClassName={desktopInactive}
               >
-                Profil
+                <Avatar initials={initials} />
+                <span className="max-w-32 truncate">{displayName}</span>
+                {isAdmin && <span className="badge badge-brand">Admin</span>}
               </NavLink>
               <form action={signOutAction}>
                 <button
@@ -148,7 +171,21 @@ export async function Header() {
                 <UnreadBadge count={unreadCount} className="absolute top-0.5 right-0.5" />
               </Link>
               <MobileMenu>
-                <p className="section-title mt-3 mb-1 px-3">Menü</p>
+                {displayName && (
+                  <Link
+                    href="/profil"
+                    className="mb-2 flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-surface-muted"
+                  >
+                    <Avatar initials={initials} className="h-9 w-9 text-sm" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-base font-medium text-zinc-900 dark:text-zinc-50">
+                        {displayName}
+                      </span>
+                      {isAdmin && <span className="badge badge-brand">Admin</span>}
+                    </span>
+                  </Link>
+                )}
+                <p className="section-title mt-1 mb-1 px-3">Menü</p>
                 {[...MEMBER_LINKS, { href: "/profil", label: "Profil" }].map((l) => (
                   <NavLink
                     key={l.href}
