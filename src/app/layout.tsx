@@ -32,7 +32,9 @@ export const viewport: Viewport = {
   ],
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+// Explicit props instead of the generated LayoutProps<"/"> global: that type
+// only exists after `next build`/`next typegen`, but CI typechecks before building.
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
   return (
