@@ -2,9 +2,10 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { getDivisionByKey, getPyramidView } from "@/server/seasons";
 import { getMemberByUserId } from "@/server/members";
-import { getEligibleDefenders } from "@/server/challenges";
+import { getViewerChallengeOverview } from "@/server/challenges";
 import { listPublishedAnnouncements } from "@/server/announcements";
 import { PyramidView } from "@/components/PyramidView";
+import { ViewerStatus } from "@/components/ViewerStatus";
 
 const DIVISION_LABEL: Record<"herren" | "damen", string> = {
   herren: "Herren",
@@ -21,18 +22,25 @@ export default async function Home({
 
   const division = await getDivisionByKey(active);
   const view = division ? await getPyramidView(division.id) : null;
-  const announcements = division ? await listPublishedAnnouncements(division.id, 3) : [];
+  const announcements = division
+    ? await listPublishedAnnouncements(division.id, 3)
+    : [];
 
   const session = await auth();
+  const member = session?.user
+    ? await getMemberByUserId(session.user.id)
+    : undefined;
+  const playsHere = !!member && !!division && member.divisionId === division.id;
+
   let viewerMemberId: string | undefined;
   let eligibleMemberIds: Set<string> | undefined;
-  if (session?.user && view) {
-    const member = await getMemberByUserId(session.user.id);
-    if (member && member.divisionId === division!.id) {
-      viewerMemberId = member.id;
-      const eligible = await getEligibleDefenders(view.season.id, member.id);
-      eligibleMemberIds = new Set(eligible.map((e) => e.memberId));
-    }
+  let overview:
+    | Awaited<ReturnType<typeof getViewerChallengeOverview>>
+    | undefined;
+  if (member && playsHere && view) {
+    viewerMemberId = member.id;
+    overview = await getViewerChallengeOverview(view.season.id, member.id);
+    eligibleMemberIds = new Set(overview.eligible.map((e) => e.memberId));
   }
 
   return (
@@ -70,11 +78,31 @@ export default async function Home({
               key={a.id}
               className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm dark:border-amber-900 dark:bg-amber-950"
             >
-              <p className="font-medium text-amber-900 dark:text-amber-200">{a.title}</p>
-              <p className="whitespace-pre-line text-amber-800 dark:text-amber-300">{a.bodyMd}</p>
+              <p className="font-medium text-amber-900 dark:text-amber-200">
+                {a.title}
+              </p>
+              <p className="whitespace-pre-line text-amber-800 dark:text-amber-300">
+                {a.bodyMd}
+              </p>
             </div>
           ))}
         </div>
+      )}
+
+      {member && (
+        <ViewerStatus
+          firstName={member.firstName}
+          lastName={member.lastName}
+          divisionKey={member.division?.key ?? null}
+          otherDivisionKey={
+            member.division && !playsHere ? member.division.key : undefined
+          }
+          seasonId={view?.season.id}
+          position={overview?.position ?? null}
+          blockedBy={view ? (overview?.blockedBy ?? null) : "not_placed"}
+          onLeaveUntil={overview?.onLeaveUntil ?? null}
+          eligible={overview?.eligible}
+        />
       )}
 
       {view ? (

@@ -108,6 +108,31 @@ export async function getEligibleDefenders(seasonId: string, challengerId: strin
   return eligible;
 }
 
+export type ChallengeBlockReason = "not_placed" | "inactive" | "on_leave" | "open_challenge";
+
+/**
+ * The logged-in member's view of the pyramid: where they stand and whom they
+ * may challenge right now — or, if nobody, why not. Mirrors the checks in
+ * createChallenge() so the UI never offers a "Fordern" button that would
+ * then be rejected.
+ */
+export async function getViewerChallengeOverview(seasonId: string, memberId: string) {
+  const position = await getPosition(seasonId, memberId);
+  const member = await db.query.members.findFirst({ where: eq(members.id, memberId) });
+
+  let blockedBy: ChallengeBlockReason | null = null;
+  let onLeaveUntil: Date | null = null;
+  if (!position) blockedBy = "not_placed";
+  else if (member?.status !== "active") blockedBy = "inactive";
+  else if (member.onLeaveUntil && member.onLeaveUntil > new Date()) {
+    blockedBy = "on_leave";
+    onLeaveUntil = member.onLeaveUntil;
+  } else if (await hasOpenChallenge(seasonId, memberId)) blockedBy = "open_challenge";
+
+  const eligible = blockedBy ? [] : await getEligibleDefenders(seasonId, memberId);
+  return { position, blockedBy, onLeaveUntil, eligible };
+}
+
 async function hasOpenChallenge(seasonId: string, memberId: string): Promise<boolean> {
   const existing = await db.query.challenges.findFirst({
     where: and(
